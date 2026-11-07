@@ -36,23 +36,23 @@ interface FakeLarkChannel {
   streams: Array<{ chatId: string; options: unknown }>;
   botIdentity: { openId: string; name: string };
   rawClient: {
-    request: ReturnType<typeof vi.fn>;
+    request: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
     im: {
       v1: {
         message: {
-          list: ReturnType<typeof vi.fn>;
+          list: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
         };
         messageReaction: {
-          create: ReturnType<typeof vi.fn>;
-          delete: ReturnType<typeof vi.fn>;
+          create: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+          delete: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
         };
       };
     };
   };
-  getAppInfo: ReturnType<typeof vi.fn>;
-  listChats: ReturnType<typeof vi.fn>;
-  fetchRawMessage: ReturnType<typeof vi.fn>;
-  recallMessage: ReturnType<typeof vi.fn>;
+  getAppInfo: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  listChats: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  fetchRawMessage: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  recallMessage: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
   on(handlers: MessageHandlerMap): void;
   connect(): Promise<void>;
   disconnect(): Promise<void>;

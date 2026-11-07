@@ -478,7 +478,7 @@ describe('profile-aware service commands', () => {
 
   it('uses the active profile when --profile is omitted and fails if none exists', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    (mocks.adapter.fileExists as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (mocks.adapter.fileExists as ReturnType<typeof vi.fn<(...args: any[]) => any>>).mockReturnValue(false);
 
     await runServiceStatus();
     // Lifecycle commands (status/stop/restart/unregister) don't install, so

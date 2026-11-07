@@ -24,6 +24,9 @@ export default defineConfig([
     platform: 'node',
     sourcemap: false,
     splitting: false,
-    dts: true,
+    // TypeScript 7 no longer ships the compiler API that tsup's bundled
+    // rollup-plugin-dts needs. Declarations are bundled separately by
+    // rolldown.dts.config.ts (see `build:dts`).
+    dts: false,
   },
 ]);

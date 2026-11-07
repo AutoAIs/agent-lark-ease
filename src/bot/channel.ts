@@ -262,6 +262,10 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
     // 8s handshake timeout (replaces hardcoded 15s). Fast-fail + fast-retry
     // beats slow-fail in unstable networks.
     handshakeTimeoutMs: 8_000,
+    // @larksuite/channel >= 0.6.1 bounds the whole connect()/force-reconnect
+    // wait with connectTimeoutMs (default 15s), not handshakeTimeoutMs. Keep
+    // the same fast-fail + fast-retry budget as the single attempt above.
+    connectTimeoutMs: 8_000,
     // Per-request REST timeout — without a cap a slow API can hang the
     // event-handling thread.
     httpTimeoutMs: 30_000,

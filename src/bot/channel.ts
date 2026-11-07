@@ -78,6 +78,16 @@ import {
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
 const REACTION_CLEANUP_GRACE_MS = 1000;
+// Feishu auto-closes a CardKit streaming card (cardElement.content path) about
+// ten minutes after creation. The bridge's markdown reply uses that path; the
+// card reply uses im.message.patch, which is not subject to the same cutoff.
+// Pause the markdown stream before the cutoff and send the final answer as a
+// standalone message.
+const STREAM_CARD_LIFETIME_MS = 10 * 60_000;
+const STREAM_CARD_SAFE_MS = 8.5 * 60_000;
+const STREAM_CARD_PAUSE_UPDATE_TIMEOUT_MS = 2000;
+const STREAM_CARD_PAUSE_NOTE =
+  '_⏳ 任务仍在运行，过程消息已停止更新；完成后会单独发送最终答案。_';
 
 const BRIDGE_AGENT_INSTRUCTIONS = [
   '你在 bridge 进程中运行，普通 lark-cli 会继承 LARK_CHANNEL=1 并进入 bridge-bound 模式。',
@@ -1202,20 +1212,38 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       let latestState: RunState = initialState;
       let producerStarted = false;
       let markdownCtrl: { setContent(markdown: string): Promise<void> } | undefined;
-      const progress = createLazyProgressStream(scope, replyMode, () =>
-        channel.stream(
-          chatId,
-          {
-            markdown: async (ctrl) => {
-              producerStarted = true;
-              if (progress.abandoned()) return;
-              markdownCtrl = ctrl;
-              await ctrl.setContent(renderText(filterForPrefs(latestState)));
-              await renderDone;
+      const progress = createLazyProgressStream(
+        scope,
+        replyMode,
+        () =>
+          channel.stream(
+            chatId,
+            {
+              markdown: async (ctrl) => {
+                producerStarted = true;
+                if (progress.abandoned()) return;
+                markdownCtrl = ctrl;
+                try {
+                  await ctrl.setContent(renderText(filterForPrefs(latestState)));
+                  await Promise.race([renderDone, progress.closeSignal()]);
+                } finally {
+                  if (markdownCtrl === ctrl) markdownCtrl = undefined;
+                }
+              },
             },
+            sendOpts,
+          ),
+        {
+          isRunning: () => latestState.terminal === 'running',
+          onExpire: async () => {
+            if (!markdownCtrl) return;
+            await withTimeout(
+              markdownCtrl.setContent(renderExpiredMarkdown(filterForPrefs(latestState))),
+              STREAM_CARD_PAUSE_UPDATE_TIMEOUT_MS,
+              'markdown card-lifetime pause',
+            );
           },
-          sendOpts,
-        ),
+        },
       );
       const renderDone = processAgentStream(
         handle,
@@ -1226,7 +1254,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         async (state) => {
           latestState = state;
           if (shouldOpenProgressStream(filterForPrefs(state))) progress.ensureOpen();
-          if (markdownCtrl) {
+          if (!progress.expired() && markdownCtrl) {
             await markdownCtrl.setContent(renderText(filterForPrefs(state)));
           }
         },
@@ -1246,7 +1274,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           },
         });
       } catch (err) {
-        if (controls.profileConfig.agentKind !== 'codex') throw err;
+        if (controls.profileConfig.agentKind !== 'codex' && !progress.expired()) throw err;
         log.fail('stream', err, { mode: replyMode, step: 'progress-stream' });
       }
       await recallIfEmptyStreamedReply(channel, progress, filterForPrefs(latestState), scope);
@@ -1256,6 +1284,17 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           chatId,
           scope,
           state: finalReplyState(progress, filterForPrefs(latestState)),
+          replyMode,
+          sendOpts,
+          cardRenderOptions,
+        });
+      } else if (progress.expired()) {
+        log.warn('stream', 'card-lifetime-final-fallback', { mode: replyMode, scope });
+        await sendFinalReply({
+          channel,
+          chatId,
+          scope,
+          state: finalAnswerOnlyState(filterForPrefs(latestState)),
           replyMode,
           sendOpts,
           cardRenderOptions,
@@ -1309,6 +1348,24 @@ interface LazyProgressStream {
    */
   abandoned(): boolean;
   abandon(): void;
+  /**
+   * True once the server-side CardKit streaming lifetime caught up with the
+   * run. Only armed for markdown streams; card streams use im.message.patch
+   * and are not subject to the ten-minute cutoff.
+   */
+  expired(): boolean;
+  /**
+   * Resolves when the producer should stop rendering. Normally this races the
+   * render loop; on expiry it fires as soon as the paused frame was pushed.
+   */
+  closeSignal(): Promise<void>;
+}
+
+interface ProgressStreamExpiry {
+  /** Don't expire a run that already reached a terminal state. */
+  isRunning(): boolean;
+  /** Push the final "still running" frame. Called before the stream closes. */
+  onExpire(): Promise<void> | void;
 }
 
 /**
@@ -1325,29 +1382,103 @@ function createLazyProgressStream(
   scope: string,
   mode: 'card' | 'markdown',
   open: () => Promise<unknown>,
+  expiry?: ProgressStreamExpiry,
 ): LazyProgressStream {
   let stream: Promise<unknown> | undefined;
   let givenUp = false;
+  let expiredFlag = false;
+  let expiryTimer: NodeJS.Timeout | undefined;
+  let closeResolve!: () => void;
+  const closeSignal = new Promise<void>((resolve) => {
+    closeResolve = resolve;
+  });
   let settle!: (result: Promise<unknown>) => void;
   const settled = new Promise<unknown>((resolve, reject) => {
     settle = (result) => {
       result.then(resolve, reject);
     };
   });
+  const clearExpiry = (): void => {
+    if (!expiryTimer) return;
+    clearTimeout(expiryTimer);
+    expiryTimer = undefined;
+  };
+  const expire = (): void => {
+    if (givenUp || !expiry) return;
+    if (!expiry.isRunning()) return;
+    expiredFlag = true;
+    log.warn('stream', 'card-lifetime-expiring', {
+      scope,
+      mode,
+      lifetimeMs: streamCardSafeMs(),
+    });
+    void (async () => {
+      try {
+        await expiry.onExpire();
+      } catch (err) {
+        log.fail('stream', err, { scope, mode, step: 'card-lifetime-pause' });
+      } finally {
+        closeResolve();
+      }
+    })();
+  };
   return {
     settled,
     opened: () => stream !== undefined,
     ensureOpen: () => {
-      if (stream) return;
+      if (stream || givenUp) return;
       log.info('outbound', 'progress-stream-open', { scope, mode });
-      stream = open();
-      settle(stream);
+      const result = open();
+      stream = result;
+      if (expiry) {
+        // The SDK/server clock starts at card creation; our timer starts a
+        // few hundred ms earlier, which is exactly the safety margin we want.
+        expiryTimer = setTimeout(expire, streamCardSafeMs());
+        expiryTimer.unref?.();
+        void result.then(clearExpiry, clearExpiry);
+      }
+      settle(result);
     },
     abandoned: () => givenUp,
     abandon: () => {
       givenUp = true;
+      clearExpiry();
+      closeResolve();
     },
+    expired: () => expiredFlag,
+    closeSignal: () => closeSignal,
   };
+}
+
+/**
+ * How long a CardKit streaming card may stay open. Feishu finalizes it at
+ * ~10 minutes; leave a safety margin. Overridable for tests / tenants that
+ * enforce a different limit.
+ */
+function streamCardSafeMs(): number {
+  const raw = process.env.LARK_CHANNEL_STREAM_CARD_SAFE_MS;
+  if (raw !== undefined) {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.min(Math.max(1, Math.floor(parsed)), STREAM_CARD_LIFETIME_MS - 60_000);
+    }
+  }
+  return STREAM_CARD_SAFE_MS;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -1368,6 +1499,11 @@ function createLazyProgressStream(
 function shouldOpenProgressStream(state: RunState): boolean {
   if (state.terminal !== 'running') return false;
   return renderText({ ...state, footer: null }).trim() !== '';
+}
+
+function renderExpiredMarkdown(state: RunState): string {
+  const body = renderText({ ...state, footer: null });
+  return body.trim() ? `${body}\n\n${STREAM_CARD_PAUSE_NOTE}` : STREAM_CARD_PAUSE_NOTE;
 }
 
 /**
@@ -1411,6 +1547,9 @@ async function recallIfEmptyStreamedReply(
   scope: string,
 ): Promise<void> {
   if (!progress.opened()) return;
+  // An expired markdown stream was deliberately left on screen with the pause
+  // notice; the final answer goes out separately.
+  if (progress.expired()) return;
   // An abandoned stream renders nothing, so whatever message it eventually
   // posts is empty by construction. It is still in flight (that is why we gave
   // up on it), so clean up in the background instead of blocking the run on it.

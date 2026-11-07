@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { AppPaths } from './app-paths';
-import { paths } from './paths';
+import { rewriteLegacyStatePaths } from './legacy-paths';
+import { legacyPaths, paths } from './paths';
 import type { AppConfig, AppPreferences, TenantBrand } from './schema';
 import { secretKeyForApp } from './schema';
 import { writeFileAtomic } from '../platform/atomic-write';
@@ -9,7 +10,8 @@ import { writeFileAtomic } from '../platform/atomic-write';
 export async function loadConfig(path: string = paths.configFile): Promise<Partial<AppConfig>> {
   try {
     const text = await readFile(path, 'utf8');
-    return JSON.parse(text) as Partial<AppConfig>;
+    const parsed = JSON.parse(text) as Partial<AppConfig>;
+    return rewriteLegacyStatePaths(parsed, legacyPaths.stateDir, paths.rootDir);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
     throw err;

@@ -88,7 +88,10 @@ describe('profile v2 migration', () => {
       admins: ['ou_admin'],
       requireMentionInGroup: false,
     });
-    expect(next.profiles.claude?.preferences).toEqual({ messageReply: 'card' });
+    expect(next.profiles.claude?.preferences).toEqual({
+      messageReply: 'card',
+      showToolCalls: true,
+    });
     expect(next.profiles.claude?.workspaces).toEqual({});
     expect(next.profiles.claude?.permissions).toEqual({
       defaultAccess: 'full',

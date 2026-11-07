@@ -213,6 +213,13 @@ export function createDefaultProfileConfig(
   return normalizeProfileConfig({
     schemaVersion: 2,
     ...input,
+    // todo's card-mode deployment is the default for new profiles. Keep this
+    // explicit in the file so it is visible and survives config round-trips.
+    preferences: {
+      messageReply: 'card',
+      showToolCalls: true,
+      ...(input.preferences ?? {}),
+    },
   });
 }
 

@@ -30,4 +30,11 @@ describe('configFormCard console URL', () => {
     const card = configFormCard(base);
     expect(JSON.stringify(card)).not.toContain('Web 控制台');
   });
+
+  it('offers card mode and selects it by default', () => {
+    const card = JSON.stringify(configFormCard({ ...base, messageReply: 'card' }));
+    expect(card).toContain('"name":"message_reply"');
+    expect(card).toContain('"value":"card"');
+    expect(card).toContain('"initial_option":"card"');
+  });
 });

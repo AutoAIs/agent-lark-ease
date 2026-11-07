@@ -38,22 +38,22 @@ interface FakeLarkChannel {
   handlers: MessageHandlerMap;
   sent: Array<{ chatId: string; content: unknown; options?: unknown }>;
   rawClient: {
-    request: ReturnType<typeof vi.fn>;
+    request: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
     application: {
       v6: {
         application: {
-          get: ReturnType<typeof vi.fn>;
+          get: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
         };
       };
     };
     im: {
       v1: {
         message: {
-          get: ReturnType<typeof vi.fn>;
+          get: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
         };
         messageReaction: {
-          create: ReturnType<typeof vi.fn>;
-          delete: ReturnType<typeof vi.fn>;
+          create: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+          delete: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
         };
       };
     };

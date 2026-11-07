@@ -171,7 +171,7 @@ describe('MeetingManager routing', () => {
     m.dispose();
     expect(m.list()).toHaveLength(0);
     // join is the only call; no /leave was issued.
-    const urls = (client.request as ReturnType<typeof vi.fn>).mock.calls.map((c) => (c[0] as { url: string }).url);
+    const urls = (client.request as ReturnType<typeof vi.fn<(...args: any[]) => any>>).mock.calls.map((c) => (c[0] as { url: string }).url);
     expect(urls.filter((u) => u.endsWith('/leave'))).toHaveLength(0);
   });
 });

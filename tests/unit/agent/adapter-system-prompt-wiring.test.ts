@@ -26,7 +26,7 @@ interface FakeChild extends EventEmitter {
   stderr: PassThrough;
   exitCode: number | null;
   signalCode: NodeJS.Signals | null;
-  kill: ReturnType<typeof vi.fn>;
+  kill: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
 }
 
 function fakeChild(): FakeChild {

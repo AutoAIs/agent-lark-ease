@@ -154,7 +154,7 @@ function fakeSignaledChild() {
   const child = new EventEmitter() as EventEmitter & {
     stdout: PassThrough;
     stderr: PassThrough;
-    kill: ReturnType<typeof vi.fn>;
+    kill: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
   };
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();

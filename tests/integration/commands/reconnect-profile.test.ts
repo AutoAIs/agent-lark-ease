@@ -72,7 +72,7 @@ describe('/reconnect profile lifecycle', () => {
 async function createHarness(): Promise<{
   tmp: TmpProfile;
   activeRuns: ActiveRuns;
-  restart: ReturnType<typeof vi.fn>;
+  restart: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
   command(content: string): Promise<boolean>;
 }> {
   const tmp = await createTmpProfile('reconnect-profile-');

@@ -1,0 +1,7 @@
+# Keep installs behaving like pnpm 10: pnpm 12 otherwise quarantines
+# packages published in the last 24h, which blocks fresh lockfiles.
+minimumReleaseAge: 0
+
+allowBuilds:
+  esbuild: true
+  protobufjs: true

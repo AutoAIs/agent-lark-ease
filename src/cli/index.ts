@@ -30,7 +30,7 @@ const program = new Command();
 
 program
   .name('agent-lark-ease')
-  .description('Bridge Feishu/Lark messenger with local CLI coding agents')
+  .description('Agent Ease for Lark — bridge Feishu/Lark messenger with local Claude Code or Codex CLI agents')
   .version(pkg.version, '-v, --version');
 
 // === process-level commands (work directly on bridge processes) ===

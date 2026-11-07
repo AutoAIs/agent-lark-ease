@@ -1,15 +1,22 @@
-# agent-lark-ease
+# Agent Ease for Lark
 
-把飞书 / Lark 消息和本地 Claude Code 或 Codex CLI 打通的轻量 bot。用一条命令启动，扫码绑定 PersonalAgent 应用，然后在飞书里和本机编程助手对话，让它读图、处理文件、改代码。
+让飞书成为智能体的新触角。
+
+`agent-lark-ease` 是项目的引用名，用于包名、CLI、状态目录和服务名。它是一个把飞书 / Lark 消息和本地 Claude Code 或 Codex CLI 打通的轻量 bot。用一条命令启动，扫码绑定 PersonalAgent 应用，然后在飞书里和本机编程助手对话，让它读图、处理文件、改代码。
 
 [English README](./README.md)
 
 关于能实现的效果，详情可以阅读[飞书文档](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e)
 
+> **项目定位**：Agent Ease for Lark（`agent-lark-ease`）最初 fork 自
+> [`lark-channel-bridge`](https://github.com/zarazhangrui/feishu-claude-code-bridge)，
+> 现已独立发展；从旧版升级见[从 lark-channel-bridge 升级](#从-lark-channel-bridge-升级)。
+
 ## 主要功能
 
 - 在飞书私聊直接发消息，或在群里 `@bot`，把任务转给本机 Claude Code / Codex CLI。
-- **流式卡片**：文本回复和工具调用实时更新在同一张卡片上。
+- **流式卡片**：文本回复和工具调用实时更新在同一张卡片上。默认的 `交互卡片` 模式还会展示工具分组、停止按钮和运行状态；也可以在 `/config` 里切换为 `流式 Markdown` 或 `纯文本`。
+- **投递加固**：最终答案超过一张卡片时会自动拆成多张；卡片投递失败会回退为纯文本。长时间的流式 Markdown 会在飞书约 10 分钟的卡片时限前暂停，再单独发送最终答案。
 - **COT 过程消息**：可选先发一条过程消息展示 agent 的阶段性文本和工具调用，再单独发送最终答案。
 - **会话延续**：每个聊天、话题或文档评论有自己的会话，不会互相串。
 - **排队与消息合并**：短时间连续发送的消息会合并处理；任务运行中收到的普通消息会排队到下一轮，`/new`、`/cd`、`/ws use`、`/stop` 这类命令可以中断当前任务。
@@ -33,9 +40,24 @@ npm i -g @autoais/agent-lark-ease
 pnpm add -g @autoais/agent-lark-ease
 ```
 
-如果之前安装过 `lark-channel-bridge`，请先停止并注销旧 daemon。首次运行任意
-`agent-lark-ease` 命令会自动把 `~/.lark-channel` 重命名为 `~/.agent-lark-ease`；
-旧版 `LARK_CHANNEL_*` 环境变量仍可作为回退读取。
+### 从 `lark-channel-bridge` 升级
+
+Agent Ease for Lark（`agent-lark-ease`）是 `lark-channel-bridge` 的独立 fork。之前安装过旧包的用户，先停止并注销旧 daemon，再安装新包：
+
+```bash
+lark-channel-bridge stop
+lark-channel-bridge unregister
+npm i -g @autoais/agent-lark-ease
+```
+
+首次运行任意 `agent-lark-ease` 命令时，本地状态会自动迁移：
+
+- `~/.lark-channel` 重命名为 `~/.agent-lark-ease`，
+  `~/.lark-channel-workspaces` 重命名为 `~/.agent-lark-ease-workspaces`。
+- `config.json` 和 `workspaces.json` 里仍指向旧状态根目录的绝对路径会在加载时改写，并在下一次保存时落盘。
+- 旧版 `LARK_CHANNEL_*` 环境变量仍可作为 `LARK_EASE_*` 的回退读取。
+- 如果旧状态目录下仍注册着运行中的旧版 bridge，启动会被拒绝，避免两个进程抢占同一个飞书应用。可设置 `LARK_EASE_ALLOW_LEGACY_BRIDGE=1` 强制继续。
+- 后台服务名随项目更名而改变。请用 `agent-lark-ease start`（按 profile）或 `agent-lark-ease start --web-ui`（supervisor + 本地控制台）重新安装服务。
 
 ## 首次启动
 
@@ -88,7 +110,7 @@ agent-lark-ease unregister [--profile <name>]
 平台映射：
 - **macOS**：launchd 用户代理 `ai.agent-lark-ease.bot.<profile>`
 - **Linux**：systemd 用户单元 `agent-lark-ease.bot.<profile>.service`
-- **Windows**：Task Scheduler 任务 `LarkChannelBridge.Bot.<profile>`，launcher 是 `.cmd`
+- **Windows**：Task Scheduler 任务 `AgentLarkEase.Bot.<profile>`，launcher 是 `.cmd`
 
 daemon 日志在 `~/.agent-lark-ease/profiles/<profile>/logs/daemon/`。
 
@@ -169,11 +191,25 @@ agent-lark-ease profile export <name> --include-secrets --yes
 
 `/config` 可以调整三类展示选项：
 
-- **消息回复方式**：`消息卡片` 流式更新最终回复；`纯文本` 在 run 完成后一次性发送。
+- **消息回复方式**：
+  - `交互卡片`（默认）：用一张结构化卡片流式展示过程和最终答案，带工具分组、停止按钮和运行状态，长任务最稳。
+  - `流式 Markdown`：轻量流式 markdown 卡片，有飞书原生打字机动画，没有按钮。
+  - `纯文本`：agent 跑完后一次性发送纯 markdown，不流式。
+  新 profile 默认使用 `交互卡片`；没有保存过回复方式的 profile 也按 `交互卡片` 处理。0.1.27 之前的 `text` 值在通过 `/config` 重新保存前同样按 `交互卡片` 处理。
 - **工具调用显示**：控制最终回复卡片 / markdown 中是否展示工具块。
 - **COT 过程消息**：`关闭` 只发送最终回复；`简略` 先用 COT 消息展示 agent 的过程文本和工具摘要；`详细` 还会展示工具参数和截断后的输出。
 
 开启 COT 后，bridge 会把过程消息和最终答案拆成两条消息。过程消息用于追踪 agent 做了什么；最终答案仍由 agent 原始文本生成，bridge 不做启发式过滤。若 agent 把最终答案也作为普通流式文本输出，COT 过程消息中可能会出现对应片段。
+
+### 卡片投递与长任务
+
+卡片渲染针对飞书的尺寸和时限做了加固：
+
+- 进度卡片控制在 50K 字符、65K 字节和 46 个顶层元素以内。超限时优先省略最早的进度内容，并用一条提示说明省略了多少项。
+- 过长的 markdown 会按换行边界拆分，代码围栏在分段处关闭，并在下一段开头重新打开。每张卡片最多保留两张表格，后续表格降级为代码块，避免触发飞书的表格数量限制。
+- 完整最终答案仍然放不下一张卡片时，会按顺序拆成多张独立卡片发送。
+- 卡片投递失败时回退为纯文本回复，不会丢答案。
+- 飞书会在 CardKit 流式卡片创建约 10 分钟后自动关闭。`流式 Markdown` 模式会在 8.5 分钟时暂停进度卡片并提示，然后单独发送最终答案；`交互卡片` 模式走消息 patch，不受这个时限影响。
 
 ## lark-cli 身份策略
 
@@ -325,7 +361,7 @@ pnpm typecheck
 pnpm build
 ```
 
-`pnpm test` 包含 unit、integration 和 process-level adapter 测试。CI 在 macOS、Ubuntu、Windows 上执行 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm typecheck` 和 `pnpm build`。
+`pnpm test` 包含 unit、integration 和 process-level adapter 测试。CI 使用 Node 26，在 macOS、Ubuntu、Windows 上执行 `pnpm install --frozen-lockfile`、`pnpm test`、`pnpm typecheck` 和 `pnpm build`。
 
 ## 可选：遥测（Telemetry）
 
@@ -340,7 +376,7 @@ LARK_EASE_TELEMETRY_MODULE=your-telemetry-package agent-lark-ease start
 该模块会收到每一条 `log.*` 事件，以及错误 / 指标钩子，转发到任何你想要的地方。接口从包根导出：
 
 ```ts
-import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'agent-lark-ease';
+import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from '@autoais/agent-lark-ease';
 
 const createAdapter: AdapterFactory = (meta) => ({
   emit(event) {/* 上报事件 */},

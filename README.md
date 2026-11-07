@@ -1,15 +1,26 @@
-# agent-lark-ease
+# Agent Ease for Lark
 
-A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
+Give your agent a new reach — Feishu / Lark.
+
+`agent-lark-ease` is the reference name for the package, CLI, state directory,
+and service labels. It is a lightweight bot that bridges Feishu / Lark messenger
+with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind
+a PersonalAgent app, and talk to your local coding agent from chat.
 
 [中文 README](./README.zh.md)
 
 For a product walkthrough, see the [Feishu document](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e).
 
+> **Project status:** Agent Ease for Lark (`agent-lark-ease`) began as a fork of
+> [`lark-channel-bridge`](https://github.com/zarazhangrui/feishu-claude-code-bridge)
+> and is now developed independently; see
+> [Upgrading from `lark-channel-bridge`](#upgrading-from-lark-channel-bridge).
+
 ## What it does
 
 - Forwards Feishu / Lark messages to local Claude Code or Codex CLI. Send a DM directly, or `@bot` in a group.
-- **Streaming card**: text replies and tool calls update on one Lark card in real time.
+- **Streaming card**: text replies and tool calls update on one Lark card in real time. The default `interactive card` mode also shows tool panels, a stop button, and run status; `streaming markdown` and `plain text` are available in `/config`.
+- **Resilient delivery**: final answers too large for one card are split across multiple cards, and card failures fall back to text. Long markdown streams pause before Feishu's ~10-minute streaming-card cutoff and deliver the final answer as a separate message.
 - **COT process messages**: optionally send a process message with agent progress text and tool calls, then send the final answer separately.
 - **Session continuity**: each chat, topic, or document comment thread keeps its own session.
 - **Queueing and batching**: messages sent in quick succession are handled together; messages sent during a run are queued for the next turn, while commands like `/new`, `/cd`, `/ws use`, and `/stop` can interrupt the current task.
@@ -33,10 +44,32 @@ npm i -g @autoais/agent-lark-ease
 pnpm add -g @autoais/agent-lark-ease
 ```
 
-If you previously installed `lark-channel-bridge`, stop and unregister its
-daemon first. The first `agent-lark-ease` command automatically renames
-`~/.lark-channel` to `~/.agent-lark-ease`; `LARK_CHANNEL_*` variables remain
-accepted as fallbacks.
+### Upgrading from `lark-channel-bridge`
+
+Agent Ease for Lark (`agent-lark-ease`) is an independent fork of
+`lark-channel-bridge`. If you previously installed the old package, stop and
+unregister its daemon before installing the new one:
+
+```bash
+lark-channel-bridge stop
+lark-channel-bridge unregister
+npm i -g @autoais/agent-lark-ease
+```
+
+The first `agent-lark-ease` command then migrates local state automatically:
+
+- `~/.lark-channel` is renamed to `~/.agent-lark-ease`, and
+  `~/.lark-channel-workspaces` to `~/.agent-lark-ease-workspaces`.
+- Absolute paths that still point into the old state root (in `config.json`
+  and `workspaces.json`) are rewritten on load and persisted on the next save.
+- `LARK_CHANNEL_*` environment variables remain accepted as fallbacks for
+  `LARK_EASE_*`.
+- Startup refuses to run while a live pre-rename bridge is still registered
+  under the old state root, so the two processes cannot fight over one Feishu
+  app. Set `LARK_EASE_ALLOW_LEGACY_BRIDGE=1` to override.
+- Background service labels changed with the name. Reinstall the service with
+  `agent-lark-ease start` (per profile) or `agent-lark-ease start --web-ui`
+  (supervisor + local console).
 
 ## First run
 
@@ -89,7 +122,7 @@ agent-lark-ease unregister [--profile <name>]
 Platform mapping:
 - **macOS**: launchd user agent `ai.agent-lark-ease.bot.<profile>`
 - **Linux**: systemd user unit `agent-lark-ease.bot.<profile>.service`
-- **Windows**: Task Scheduler task `LarkChannelBridge.Bot.<profile>`, launched through a `.cmd` wrapper
+- **Windows**: Task Scheduler task `AgentLarkEase.Bot.<profile>`, launched through a `.cmd` wrapper
 
 Daemon logs are under `~/.agent-lark-ease/profiles/<profile>/logs/daemon/`.
 
@@ -170,11 +203,25 @@ DMs do not require an @ mention. Groups and topic groups require `@bot` by defau
 
 `/config` controls three presentation settings:
 
-- **Message reply mode**: `message card` streams the final reply; `plain text` sends once after the run finishes.
+- **Message reply mode**:
+  - `interactive card` (default): streams progress and the final answer on one structured card with tool panels, a stop button, and footer status. Best for long tasks.
+  - `streaming markdown`: a lightweight streaming markdown card with Feishu's native typewriter effect and no buttons.
+  - `plain text`: sends the finished answer once as a plain markdown post.
+  New profiles default to `interactive card`. Profiles with no saved reply mode also resolve to `interactive card`; pre-0.1.27 `text` values are treated as `interactive card` until the profile is saved through `/config`.
 - **Tool-call display**: controls whether tool blocks appear in the final card / markdown reply.
 - **COT process message**: `off` sends only the final reply; `brief` first sends a COT message with agent progress text and tool summaries; `detailed` also includes tool args and truncated output.
 
 When COT is enabled, the bridge splits the process view and final answer into two messages. The COT message is for tracing what the agent did; the final answer is still generated from the agent's raw text, without heuristic bridge-side filtering. If an agent emits final-answer text as ordinary stream text, that text can also appear in the COT process message.
+
+### Card delivery and long runs
+
+Card rendering is hardened against Feishu's size and lifetime limits:
+
+- Progress cards stay within 50K characters, 65K bytes, and 46 top-level elements. When a card would exceed the budget, the earliest progress elements are omitted and replaced with a short notice.
+- Long markdown is split at newline boundaries, with code fences closed at the end of a piece and reopened at the start of the next. Each card keeps at most two tables; later tables are demoted to fenced code blocks to avoid Feishu's table-count limit.
+- If the complete final answer still does not fit on one card, it is delivered as multiple standalone cards in order.
+- If card delivery fails, the bridge falls back to a plain-text reply instead of losing the answer.
+- Feishu closes CardKit streaming cards about 10 minutes after creation. `streaming markdown` mode pauses the progress card at 8.5 minutes with a notice, then sends the final answer as a separate message. `interactive card` mode uses message patches and is not subject to that cutoff.
 
 ## lark-cli identity policy
 
@@ -326,7 +373,7 @@ pnpm typecheck
 pnpm build
 ```
 
-`pnpm test` includes unit, integration, and process-level adapter tests. CI runs on macOS, Ubuntu, and Windows with `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm typecheck`, and `pnpm build`.
+`pnpm test` includes unit, integration, and process-level adapter tests. CI runs on Node 26 across macOS, Ubuntu, and Windows with `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm typecheck`, and `pnpm build`.
 
 ## Optional telemetry
 
@@ -341,7 +388,7 @@ LARK_EASE_TELEMETRY_MODULE=your-telemetry-package agent-lark-ease start
 That module receives every `log.*` event plus error/metric hooks and forwards them wherever you like. The interface is exported from the package root:
 
 ```ts
-import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'agent-lark-ease';
+import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from '@autoais/agent-lark-ease';
 
 const createAdapter: AdapterFactory = (meta) => ({
   emit(event) {/* ship event */},

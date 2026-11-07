@@ -1,7 +1,7 @@
 {
   "name": "@autoais/agent-lark-ease",
   "version": "0.8.1",
-  "description": "agent-lark-ease: bridge Feishu/Lark messenger with local CLI coding agents",
+  "description": "Agent Ease for Lark — bridge Feishu/Lark messenger with local Claude Code or Codex CLI agents",
   "type": "module",
   "packageManager": "pnpm@12.18.0",
   "publishConfig": {

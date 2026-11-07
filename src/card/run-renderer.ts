@@ -1,3 +1,12 @@
+import { collapsiblePanel, markdown, noteMd, panelHeader } from './elements';
+import {
+  cardTableKeep,
+  cardTextMaxChars,
+  compactCardElements,
+  demoteTablesInElements,
+  fitCardToCaps,
+  splitTextInElements,
+} from './limits';
 import { deepMaskEmails } from './mask-email';
 import type { Block, FooterStatus, RunState, ToolEntry } from './run-state';
 import { toolBodyMd, toolHeaderText } from './tool-render';
@@ -17,6 +26,12 @@ type Group = ToolGroup | TextGroup;
 
 export interface RunCardRenderOptions {
   signCallback?: (action: string) => string;
+  /**
+   * Render the complete answer without progress-card compaction/budget
+   * trimming. Final delivery uses this and splits the result across messages;
+   * streamed progress cards and command cards use the default budgeted path.
+   */
+  fullContent?: boolean;
 }
 
 export function renderCard(state: RunState, options: RunCardRenderOptions = {}): object {
@@ -52,16 +67,25 @@ export function renderCard(state: RunState, options: RunCardRenderOptions = {}):
     elements.push(stopButton(options));
   }
 
-  // Mask raw emails across every text field so the Feishu tenant audit doesn't
-  // reject the (streamed) card with a 400 EMAIL_ADDRESS — see mask-email.ts.
-  return deepMaskEmails({
+  // Mask raw emails before size normalization: masking rewrites `@` to `[at]`
+  // (+3 chars per address), so the limits must be measured on the final text.
+  const masked = deepMaskEmails({
     schema: '2.0',
     config: {
       streaming_mode: state.terminal === 'running',
       summary: { content: summaryText(state) },
     },
     body: { elements },
-  });
+  }) as { schema: string; config: Record<string, unknown>; body: { elements: object[] } };
+
+  let normalized = demoteTablesInElements(masked.body.elements, cardTableKeep());
+  normalized = splitTextInElements(normalized, cardTextMaxChars());
+  if (!options.fullContent) {
+    normalized = compactCardElements(normalized);
+    const fitted = fitCardToCaps({ ...masked, body: { elements: normalized } });
+    return deepMaskEmails(fitted);
+  }
+  return deepMaskEmails({ ...masked, body: { elements: normalized } });
 }
 
 function* groupBlocks(blocks: Block[]): Generator<Group> {
@@ -141,43 +165,6 @@ function collapsedToolSummary(tools: ToolEntry[], finalized: boolean): object {
     padding: '8px 8px 8px 8px',
     elements: [{ tag: 'markdown', content: headerList, text_size: 'notation' }],
   };
-}
-
-interface PanelOpts {
-  title: string;
-  expanded: boolean;
-  border: 'grey' | 'red' | 'blue';
-  body: string;
-}
-
-function collapsiblePanel(opts: PanelOpts): object {
-  return {
-    tag: 'collapsible_panel',
-    expanded: opts.expanded,
-    header: panelHeader(opts.title),
-    border: { color: opts.border, corner_radius: '5px' },
-    vertical_spacing: '8px',
-    padding: '8px 8px 8px 8px',
-    elements: [{ tag: 'markdown', content: opts.body, text_size: 'notation' }],
-  };
-}
-
-function panelHeader(titleMd: string): object {
-  return {
-    title: { tag: 'markdown', content: titleMd },
-    vertical_align: 'center',
-    icon: { tag: 'standard_icon', token: 'down-small-ccm_outlined', size: '16px 16px' },
-    icon_position: 'follow_text',
-    icon_expanded_angle: -180,
-  };
-}
-
-function markdown(content: string): object {
-  return { tag: 'markdown', content };
-}
-
-function noteMd(content: string): object {
-  return { tag: 'markdown', content, text_size: 'notation' };
 }
 
 function stopButton(options: RunCardRenderOptions): object {

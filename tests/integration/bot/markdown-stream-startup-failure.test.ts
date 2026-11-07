@@ -37,6 +37,8 @@ interface FakeLarkChannel {
   botIdentity: { openId: string; name: string };
   handlers: MessageHandlerMap;
   sent: Array<{ chatId: string; content: unknown; options?: unknown }>;
+  updatedCards: Array<{ messageId: string; card: unknown }>;
+  recalledMessages: string[];
   rawClient: {
     request: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
     application: {
@@ -504,6 +506,93 @@ describe('markdown stream startup failures', () => {
     expect(JSON.stringify(progressCards)).not.toContain('过程消息已停止更新');
     expect(JSON.stringify(progressCards)).toContain('WORK_IN_PROGRESS');
   });
+
+  it('splits an oversized Claude card final answer and updates the progress card', async () => {
+    vi.stubEnv('LARK_CHANNEL_CARD_MAX_ELEMENTS', '3');
+    vi.stubEnv('LARK_CHANNEL_CARD_MAX_CHARS', '4000');
+    vi.stubEnv('LARK_CHANNEL_CARD_MAX_BYTES', '8000');
+    vi.stubEnv('LARK_CHANNEL_CARD_TEXT_MAX_CHARS', '1500');
+    const h = await createHarness({
+      agentKind: 'claude',
+      messageReply: 'card',
+      events: [
+        { type: 'text', delta: 'LONG_ANSWER '.repeat(900) },
+        { type: 'done', terminationReason: 'normal' },
+      ],
+      stream: async (_chatId, input) => {
+        const producer = (input as {
+          card?: { producer?: (ctrl: { update(next: unknown): Promise<void> }) => Promise<void> };
+        }).card?.producer;
+        await producer?.({ update: vi.fn(async () => {}) });
+        return { messageId: 'om_progress' };
+      },
+    });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(message('om_long_final', 'run'));
+    await waitFor(() => h.channel.updatedCards.length > 0 && h.channel.sent.length > 0, 4000);
+
+    expect(h.channel.updatedCards[0]?.messageId).toBe('om_progress');
+    expect(h.channel.sent.length).toBeGreaterThan(0);
+    const all = JSON.stringify([h.channel.updatedCards[0]?.card, ...h.channel.sent.map((s) => s.content)]);
+    expect(all).toContain('LONG_ANSWER');
+    for (const part of [h.channel.updatedCards[0]?.card, ...h.channel.sent.map((s) => s.content)]) {
+      expect(JSON.stringify(part).length).toBeLessThanOrEqual(4000);
+    }
+  });
+
+  it('delivers the final answer when the card stream terminal patch fails', async () => {
+    const h = await createHarness({
+      agentKind: 'claude',
+      messageReply: 'card',
+      events: [
+        { type: 'text', delta: 'FINAL_ANSWER' },
+        { type: 'done', terminationReason: 'normal' },
+      ],
+      stream: async (_chatId, input) => {
+        const producer = (input as {
+          card?: { producer?: (ctrl: { update(next: unknown): Promise<void> }) => Promise<void> };
+        }).card?.producer;
+        await producer?.({ update: vi.fn(async () => {}) });
+        throw new Error('terminal patch failed');
+      },
+    });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(message('om_patch_failed', 'run'));
+    await waitFor(() => h.channel.sent.length === 1, 4000);
+
+    expect(JSON.stringify(h.channel.sent[0]?.content)).toContain('FINAL_ANSWER');
+  });
+
+  it('does not re-update the progress card when the single final segment is unchanged', async () => {
+    const info = vi.spyOn(log, 'info');
+    const h = await createHarness({
+      agentKind: 'claude',
+      messageReply: 'card',
+      events: [
+        { type: 'text', delta: 'SHORT_ANSWER' },
+        { type: 'done', terminationReason: 'normal' },
+      ],
+      stream: async (_chatId, input) => {
+        const producer = (input as {
+          card?: { producer?: (ctrl: { update(next: unknown): Promise<void> }) => Promise<void> };
+        }).card?.producer;
+        await producer?.({ update: vi.fn(async () => {}) });
+        return { messageId: 'om_progress' };
+      },
+    });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(message('om_single_segment', 'run'));
+    // finalizeCardSplitDelivery logs card.metrics before deciding whether to
+    // update; wait for that decision point rather than a fixed sleep.
+    await waitFor(
+      () => info.mock.calls.some((call) => call[0] === 'card' && call[1] === 'metrics'),
+      4000,
+    );
+    expect(h.channel.updatedCards).toHaveLength(0);
+  });
 });
 
 async function createHarness(options: {
@@ -611,9 +700,13 @@ function createFakeLarkChannel(harnessOptions: {
 } = {}): FakeLarkChannel {
   const handlers: MessageHandlerMap = {};
   const sent: FakeLarkChannel['sent'] = [];
+  const updatedCards: FakeLarkChannel['updatedCards'] = [];
+  const recalledMessages: FakeLarkChannel['recalledMessages'] = [];
   const channel: FakeLarkChannel = {
     handlers,
     sent,
+    updatedCards,
+    recalledMessages,
     botIdentity: { openId: 'ou_bot', name: 'Bridge' },
     rawClient: {
       request: vi.fn(async () => ({ data: { items: [] } })),
@@ -657,8 +750,12 @@ function createFakeLarkChannel(harnessOptions: {
     stream: harnessOptions.stream ?? (async () => {
       await new Promise<void>(() => {});
     }),
-    async updateCard() {},
-    async recallMessage() {},
+    async updateCard(messageId, card) {
+      updatedCards.push({ messageId, card });
+    },
+    async recallMessage(messageId) {
+      recalledMessages.push(messageId);
+    },
     async addReaction(messageId, emojiType) {
       const r = await channel.rawClient.im.v1.messageReaction.create({
         path: { message_id: messageId },

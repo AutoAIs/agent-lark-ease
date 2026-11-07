@@ -15,6 +15,10 @@ import {
   type BridgePromptTopicMessage,
 } from '../agent/prompt';
 import type { AgentAdapter, AgentEvent } from '../agent/types';
+import {
+  finalizeCardSplitDelivery,
+  sendCardSegments,
+} from '../card/delivery';
 import { handleCardAction } from '../card/dispatcher';
 import { CallbackAuth } from '../card/callback-auth';
 import { CallbackNonceStore } from '../card/callback-store';
@@ -1141,6 +1145,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     if (replyMode === 'card') {
       let latestState: RunState = initialState;
       let producerStarted = false;
+      let streamFailed = false;
+      let lastStreamedCardJson: string | undefined;
       let cardCtrl:
         | { update(next: object | ((current: object) => object)): Promise<void> }
         | undefined;
@@ -1154,7 +1160,9 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
                 producerStarted = true;
                 if (progress.abandoned()) return;
                 cardCtrl = ctrl;
-                await ctrl.update(renderCard(filterForPrefs(latestState), cardRenderOptions));
+                const rendered = renderCard(filterForPrefs(latestState), cardRenderOptions);
+                lastStreamedCardJson = JSON.stringify(rendered);
+                await ctrl.update(rendered);
                 await renderDone;
               },
             },
@@ -1172,7 +1180,9 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           latestState = state;
           if (shouldOpenProgressStream(filterForPrefs(state))) progress.ensureOpen();
           if (cardCtrl) {
-            await cardCtrl.update(renderCard(filterForPrefs(state), cardRenderOptions));
+            const rendered = renderCard(filterForPrefs(state), cardRenderOptions);
+            lastStreamedCardJson = JSON.stringify(rendered);
+            await cardCtrl.update(rendered);
           }
         },
       );
@@ -1184,17 +1194,27 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           producerStarted: () => producerStarted,
           fallback: async (state) => {
             if (controls.profileConfig.agentKind === 'codex') return;
-            if (renderText(filterForPrefs(state)).trim() === '') return;
-            await channel.send(
+            await sendCardSegments({
+              channel,
               chatId,
-              { card: renderCard(filterForPrefs(state), cardRenderOptions) },
+              scope,
+              state: filterForPrefs(state),
               sendOpts,
-            );
+              cardRenderOptions,
+            });
           },
         });
       } catch (err) {
-        if (controls.profileConfig.agentKind !== 'codex') throw err;
-        log.fail('stream', err, { mode: replyMode, step: 'progress-stream' });
+        if (controls.profileConfig.agentKind !== 'codex') {
+          if (!producerStarted) throw err;
+          // The producer started, so the progress card may already carry
+          // content. A terminal patch failure must not lose the answer: treat
+          // the card as untrusted and deliver the final state separately.
+          streamFailed = true;
+          log.fail('stream', err, { mode: replyMode, step: 'progress-stream' });
+        } else {
+          log.fail('stream', err, { mode: replyMode, step: 'progress-stream' });
+        }
       }
       await recallIfEmptyStreamedReply(channel, progress, filterForPrefs(latestState), scope);
       if (controls.profileConfig.agentKind === 'codex') {
@@ -1206,6 +1226,26 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           replyMode,
           sendOpts,
           cardRenderOptions,
+        });
+      } else if (streamFailed) {
+        await sendCardSegments({
+          channel,
+          chatId,
+          scope,
+          state: finalAnswerOnlyState(filterForPrefs(latestState)),
+          sendOpts,
+          cardRenderOptions,
+        });
+      } else {
+        await finalizeCardSplitDelivery({
+          channel,
+          chatId,
+          scope,
+          state: finalAnswerOnlyState(filterForPrefs(latestState)),
+          sendOpts,
+          cardRenderOptions,
+          progress,
+          lastStreamedCardJson,
         });
       }
     } else if (replyMode === 'markdown') {
@@ -1604,13 +1644,14 @@ async function sendFinalReply(input: {
   }
 
   if (input.replyMode === 'card') {
-    const result = await input.channel.send(
-      input.chatId,
-      { card: renderCard(input.state, input.cardRenderOptions) },
-      input.sendOpts,
-    );
-    requireMessageReceipt(result, 'card');
-    log.info('outbound', 'sent', outboundLogFields(input, 'card', body, result));
+    await sendCardSegments({
+      channel: input.channel,
+      chatId: input.chatId,
+      scope: input.scope,
+      state: input.state,
+      sendOpts: input.sendOpts,
+      cardRenderOptions: input.cardRenderOptions,
+    });
   } else if (input.replyMode === 'markdown') {
     if (body.trim()) {
       const result = await input.channel.send(

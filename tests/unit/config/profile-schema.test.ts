@@ -36,6 +36,18 @@ describe('profile schema', () => {
     });
   });
 
+  it('defaults new profiles to card replies with tool calls visible', () => {
+    const cfg = createDefaultProfileConfig({
+      agentKind: 'claude',
+      accounts: { app },
+    });
+
+    expect(cfg.preferences).toEqual({
+      messageReply: 'card',
+      showToolCalls: true,
+    });
+  });
+
   it('defaults Codex sandbox to danger-full-access to match Claude bridge local tool access', () => {
     const cfg = createDefaultProfileConfig({
       agentKind: 'codex',

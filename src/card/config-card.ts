@@ -175,19 +175,17 @@ export function configFormCard(opts: ConfigFormOpts): object {
               content:
                 '**消息回复方式**\n' +
                 '_纯文本:agent 跑完一次性发出,不流式,体感最轻_\n' +
-                '_消息卡片:轻量流式 markdown 卡片,飞书原生打字机动画_',
+                '_流式 Markdown:轻量流式 markdown,飞书原生打字机动画_\n' +
+                '_交互卡片(默认):结构化卡片,工具分组、可折叠,长任务最稳_',
             },
             {
               tag: 'select_static',
               name: 'message_reply',
-              // 'card' (交互卡片) is hidden from the picker for now; existing
-              // configs with `messageReply: 'card'` still work — showConfigForm
-              // displays them as 'markdown' in the form, but submitting only
-              // overwrites if the user actually picks something.
-              initial_option: opts.messageReply === 'card' ? 'markdown' : opts.messageReply,
+              initial_option: opts.messageReply,
               options: [
                 { text: { tag: 'plain_text', content: '纯文本' }, value: 'text' },
-                { text: { tag: 'plain_text', content: '消息卡片(默认)' }, value: 'markdown' },
+                { text: { tag: 'plain_text', content: '流式 Markdown' }, value: 'markdown' },
+                { text: { tag: 'plain_text', content: '交互卡片(默认)' }, value: 'card' },
               ],
             },
             {

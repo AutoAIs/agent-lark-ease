@@ -18,17 +18,22 @@ describe('Claude IM regression boundaries', () => {
     expect(getRequireMentionInGroup(cfg)).toBe(true);
   });
 
-  it('keeps markdown as the default reply mode and card as the explicit stop-button mode', () => {
+  it('defaults to card mode and keeps explicit markdown', () => {
     const defaultCfg = {
       accounts: { app: { id: 'app-id', secret: 'secret', tenant: 'feishu' as const } },
     };
-    const cardCfg = {
+    const markdownCfg = {
       ...defaultCfg,
-      preferences: { messageReply: 'card' as const },
+      preferences: { messageReply: 'markdown' as const },
+    };
+    const legacyTextCfg = {
+      ...defaultCfg,
+      preferences: { messageReply: 'text' as const },
     };
 
-    expect(getMessageReplyMode(defaultCfg)).toBe('markdown');
-    expect(getMessageReplyMode(cardCfg)).toBe('card');
+    expect(getMessageReplyMode(defaultCfg)).toBe('card');
+    expect(getMessageReplyMode(markdownCfg)).toBe('markdown');
+    expect(getMessageReplyMode(legacyTextCfg)).toBe('card');
   });
 
   it('queues messages that arrive while a run is active and flushes them as the next batch', () => {

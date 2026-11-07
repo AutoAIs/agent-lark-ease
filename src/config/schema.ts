@@ -198,20 +198,20 @@ export function secretKeyForApp(appId: string): string {
 /**
  * Resolve the message-reply preference with default fallback + legacy coerce.
  *
- * Pre-0.1.27 users with `messageReply: 'text'` actually wanted the streaming
- * markdown card (the new `'markdown'`). Until they re-submit `/config`
- * (which sets `messageReplyMigrated: true`), we map their `text` →
- * `markdown` so the behavior stays the same after upgrade.
+ * Pre-0.1.27 users with `messageReply: 'text'` actually wanted a streamed
+ * card. Until they re-submit `/config` (which sets
+ * `messageReplyMigrated: true`), we map their `text` → `card`, matching the
+ * todo deployment's default.
  *
- * Default for fresh configs (no `messageReply` set) is `'markdown'`.
+ * Default for fresh configs (no `messageReply` set) is `'card'`.
  */
 export function getMessageReplyMode(cfg: AppConfig): MessageReplyMode {
   const raw = cfg.preferences?.messageReply;
   if (raw === 'text' && cfg.preferences?.messageReplyMigrated !== true) {
-    return 'markdown';
+    return 'card';
   }
   if (raw === 'card' || raw === 'markdown' || raw === 'text') return raw;
-  return 'markdown';
+  return 'card';
 }
 
 /** Resolve the show-tool-calls preference with default fallback. */

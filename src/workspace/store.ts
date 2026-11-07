@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { paths } from '../config/paths';
+import { rewriteLegacyStatePaths } from '../config/legacy-paths';
+import { legacyPaths, paths } from '../config/paths';
 import { log } from '../core/logger';
 import { writeFileAtomic } from '../platform/atomic-write';
 
@@ -20,7 +21,11 @@ export class WorkspaceStore {
   async load(): Promise<void> {
     try {
       const text = await readFile(this.path, 'utf8');
-      const parsed = JSON.parse(text) as Partial<WorkspaceData>;
+      const parsed = rewriteLegacyStatePaths(
+        JSON.parse(text) as Partial<WorkspaceData>,
+        legacyPaths.stateDir,
+        paths.rootDir,
+      );
       this.data = {
         chats: parsed.chats ?? {},
         named: parsed.named ?? {},

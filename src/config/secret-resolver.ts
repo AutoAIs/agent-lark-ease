@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import { spawnProcess, type SpawnedProcessByStdio } from '../platform/spawn';
 import { getSecret, type KeystorePaths } from './keystore';
-import { paths } from './paths';
+import { legacyPaths, paths } from './paths';
 import type { AppConfig, ProviderConfig, SecretInput, SecretRef } from './schema';
 import { isSecretRef, secretKeyForApp } from './schema';
 
@@ -124,8 +124,9 @@ async function resolveExecRef(
   if (!pc?.command) {
     throw new Error('exec provider missing `command`');
   }
+  const command = normalizeLegacyProviderCommand(pc.command);
 
-  if (isSelfBridgeCommand(pc.command, pc.args)) {
+  if (isSelfBridgeCommand(command, pc.args)) {
     // Short-circuit: read keystore directly. The expected id under the
     // bridge convention is `app-<appId>`; if the user wired something
     // else, fall back to ref.id verbatim.
@@ -137,7 +138,19 @@ async function resolveExecRef(
     throw new Error(`keystore has no entry for "${ref.id}" or "${conventional}"`);
   }
 
-  return spawnExecProvider(pc, ref);
+  return spawnExecProvider({ ...pc, command }, ref);
+}
+
+/**
+ * Configs written before the rename point at
+ * `<old-root>/secrets-getter`. Treat that as the current wrapper instead of
+ * spawning a path that no longer exists.
+ */
+function normalizeLegacyProviderCommand(command: string): string {
+  if (command === join(legacyPaths.stateDir, 'secrets-getter')) {
+    return paths.secretsGetterScript;
+  }
+  return command;
 }
 
 function isSelfBridgeCommand(command: string, args: string[] | undefined): boolean {

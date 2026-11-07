@@ -4,6 +4,8 @@ import * as lockfile from 'proper-lockfile';
 import { writeFileAtomic } from '../platform/atomic-write';
 import { resolveAppPaths } from './app-paths';
 import { readBridgeEnv } from './env-compat';
+import { rewriteLegacyStatePaths } from './legacy-paths';
+import { legacyPaths, paths } from './paths';
 import {
   normalizeProfileConfig,
   type AgentKind,
@@ -15,7 +17,8 @@ import type { AppConfig } from './schema';
 export async function loadRootConfig(path: string): Promise<RootConfig | undefined> {
   try {
     const parsed = JSON.parse(await readFile(path, 'utf8')) as unknown;
-    return isRootConfig(parsed) ? normalizeRootConfig(parsed) : undefined;
+    const rewritten = rewriteLegacyStatePaths(parsed, legacyPaths.stateDir, paths.rootDir);
+    return isRootConfig(rewritten) ? normalizeRootConfig(rewritten) : undefined;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;

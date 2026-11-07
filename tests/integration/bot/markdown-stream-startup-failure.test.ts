@@ -78,6 +78,7 @@ const cleanups: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   sdkMock.channel = undefined;
   sdkMock.createLarkChannel.mockClear();
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
@@ -429,6 +430,80 @@ describe('markdown stream startup failures', () => {
     expect(finalJson).not.toContain('progress update');
     expect(h.channel.sent[0]?.options).toMatchObject({ replyTo: 'om_card_final' });
   });
+
+  it('pauses the markdown stream and sends the final answer separately after the card lifetime', async () => {
+    vi.stubEnv('LARK_CHANNEL_STREAM_CARD_SAFE_MS', '60');
+    const visible: string[] = [];
+    const h = await createHarness({
+      agentKind: 'claude',
+      messageReply: 'markdown',
+      events: [
+        { type: 'text', delta: 'WORK_IN_PROGRESS' },
+        { type: 'done', terminationReason: 'normal' },
+      ],
+      // Keep the run alive past the lifetime timer, then finish.
+      eventsDelayMs: 250,
+      stream: async (_chatId, input) => {
+        const producer = (input as {
+          markdown?: (ctrl: { setContent(markdown: string): Promise<void> }) => Promise<void>;
+        }).markdown;
+        await producer?.({
+          setContent: vi.fn(async (markdown: string) => {
+            visible.push(markdown);
+          }),
+        });
+      },
+    });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(message('om_expired', 'run'));
+    await waitFor(() => visible.some((md) => md.includes('过程消息已停止更新')), 2000);
+    await waitFor(() => h.channel.sent.length === 1, 4000);
+
+    // The stream ends with an explicit pause notice instead of a live footer,
+    // and the answer arrives as a standalone message.
+    expect(visible.at(-1)).toContain('过程消息已停止更新');
+    expect(lastMarkdown(h.channel)).toContain('WORK_IN_PROGRESS');
+    expect(lastMarkdown(h.channel)).not.toContain('过程消息已停止更新');
+    expect(h.channel.sent).toHaveLength(1);
+    expect(h.channel.sent[0]?.options).toMatchObject({ replyTo: 'om_expired' });
+  });
+
+  it('does not pause card-mode progress at the markdown lifetime threshold', async () => {
+    vi.stubEnv('LARK_CHANNEL_STREAM_CARD_SAFE_MS', '60');
+    const progressCards: unknown[] = [];
+    const h = await createHarness({
+      agentKind: 'claude',
+      messageReply: 'card',
+      events: [
+        { type: 'text', delta: 'WORK_IN_PROGRESS' },
+        { type: 'done', terminationReason: 'normal' },
+      ],
+      eventsDelayMs: 250,
+      stream: async (_chatId, input) => {
+        const producer = (input as {
+          card?: { producer?: (ctrl: { update(next: unknown): Promise<void> }) => Promise<void> };
+        }).card?.producer;
+        await producer?.({
+          update: vi.fn(async (next: unknown) => {
+            progressCards.push(next);
+          }),
+        });
+      },
+    });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(message('om_card_no_expiry', 'run'));
+    await waitFor(
+      () =>
+        progressCards.length > 0 &&
+        JSON.stringify(progressCards.at(-1)).includes('"streaming_mode":false'),
+      4000,
+    );
+
+    expect(JSON.stringify(progressCards)).not.toContain('过程消息已停止更新');
+    expect(JSON.stringify(progressCards)).toContain('WORK_IN_PROGRESS');
+  });
 });
 
 async function createHarness(options: {
@@ -440,6 +515,8 @@ async function createHarness(options: {
   messageReply?: 'card' | 'markdown' | 'text';
   /** Codex holds its answer back for a dedicated final reply; Claude streams it. */
   agentKind?: 'claude' | 'codex';
+  /** Keep a run alive between events to exercise lifetime timers. */
+  eventsDelayMs?: number;
 } = {}): Promise<{
   tmp: TmpProfile;
   channel: FakeLarkChannel;
@@ -480,6 +557,7 @@ async function createHarness(options: {
   const agent = new FakeAgentAdapter({
     id: 'codex',
     displayName: 'Codex',
+    eventsDelayMs: options.eventsDelayMs,
     events: options.events ?? [
       [
         {

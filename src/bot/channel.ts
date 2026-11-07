@@ -33,6 +33,7 @@ import {
 } from '../card/run-state';
 import { renderText } from '../card/text-renderer';
 import { tryHandleCommand, type Controls } from '../commands';
+import { readBridgeEnv } from '../config/env-compat';
 import type { AppConfig } from '../config/schema';
 import {
   getAgentStopGraceMs,
@@ -94,8 +95,8 @@ const STREAM_CARD_PAUSE_NOTE =
   '_⏳ 任务仍在运行，过程消息已停止更新；完成后会单独发送最终答案。_';
 
 const BRIDGE_AGENT_INSTRUCTIONS = [
-  '你在 bridge 进程中运行，普通 lark-cli 会继承 LARK_CHANNEL=1 并进入 bridge-bound 模式。',
-  '不要 unset LARK_CHANNEL / LARK_CHANNEL_HOME / LARK_CHANNEL_PROFILE / LARKSUITE_CLI_CONFIG_DIR，也不要用 env -u LARK_CHANNEL 绕回本机普通配置。',
+  '你在 bridge 进程中运行，普通 lark-cli 会继承 LARK_EASE=1（旧版 lark-cli 还会看到镜像的 LARK_CHANNEL=1）并进入 bridge-bound 模式。',
+  '不要 unset LARK_EASE / LARK_EASE_HOME / LARK_EASE_PROFILE / LARKSUITE_CLI_CONFIG_DIR，也不要用 env -u LARK_EASE 绕回本机普通配置。',
   'Codex bridge 默认使用 danger-full-access 对齐 Claude bridge 的 bypassPermissions 行为，因此 lark-cli 应能像用户本机终端一样访问 keychain。',
   '如果提示 lark-channel context detected but not bound，停止当前操作并请用户重启 bridge 或运行 bridge doctor/preflight；不要改用普通 profile，不要自行 bind，也不要直接读取 config.json 里的账号或密钥。',
 ];
@@ -249,7 +250,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       cfg.accounts.app.tenant === 'lark'
         ? 'https://open.larksuite.com'
         : 'https://open.feishu.cn',
-    source: 'lark-channel-bridge',
+    source: 'agent-lark-ease',
     logger: buildQuietLogger(),
     policy: {
       dmMode: 'open',
@@ -1496,7 +1497,7 @@ function createLazyProgressStream(
  * enforce a different limit.
  */
 function streamCardSafeMs(): number {
-  const raw = process.env.LARK_CHANNEL_STREAM_CARD_SAFE_MS;
+  const raw = readBridgeEnv('STREAM_CARD_SAFE_MS');
   if (raw !== undefined) {
     const parsed = Number(raw);
     if (Number.isFinite(parsed) && parsed > 0) {

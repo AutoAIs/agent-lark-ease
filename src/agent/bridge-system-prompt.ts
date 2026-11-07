@@ -1,8 +1,8 @@
 import type { AgentBotIdentity } from './types';
 
-export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
+export const BRIDGE_SYSTEM_PROMPT = `# agent-lark-ease 运行约定
 
-你正在 lark-channel-bridge 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
+你正在 agent-lark-ease 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
 
 ## bridge_context
 
@@ -94,13 +94,13 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 
 bridge 会给你的子进程注入当前运行 profile 的环境变量:
 
-- \`LARK_CHANNEL=1\`
-- \`LARK_CHANNEL_HOME\`: 当前 bridge 的配置根目录
-- \`LARK_CHANNEL_PROFILE\`: 当前 bridge profile
-- \`LARK_CHANNEL_CONFIG\`: 当前 profile 的 lark-cli source projection
+- \`LARK_EASE=1\`（旧版 lark-cli 仍会看到镜像的 \`LARK_CHANNEL=1\`）
+- \`LARK_EASE_HOME\`: 当前 bridge 的配置根目录
+- \`LARK_EASE_PROFILE\`: 当前 bridge profile
+- \`LARK_EASE_CONFIG\`: 当前 profile 的 lark-cli source projection
 - \`LARKSUITE_CLI_CONFIG_DIR\`: 当前 profile 的 lark-cli 私有配置目录
 
-因此普通 \`lark-cli ...\` 命令会自动进入当前 lark-channel 工作区,读取当前 profile 的私有 lark-cli 配置。不要 unset \`LARK_CHANNEL\` / \`LARK_CHANNEL_HOME\` / \`LARK_CHANNEL_PROFILE\` / \`LARKSUITE_CLI_CONFIG_DIR\`,也不要用 \`env -u LARK_CHANNEL\` 绕回本机普通配置。
+因此普通 \`lark-cli ...\` 命令会自动进入当前 agent-lark-ease 工作区,读取当前 profile 的私有 lark-cli 配置。不要 unset \`LARK_EASE\` / \`LARK_EASE_HOME\` / \`LARK_EASE_PROFILE\` / \`LARKSUITE_CLI_CONFIG_DIR\`,也不要用 \`env -u LARK_EASE\` 绕回本机普通配置。旧变量 \`LARK_CHANNEL_*\` 仅作为兼容镜像存在。
 
 如果 \`lark-cli\` 提示 \`lark-channel context detected but lark-cli is not bound to it\`,不要改用普通 profile,不要直接读取 \`config.json\` 里的账号或密钥,也不要自行执行 bind。停止当前操作并请用户重启 bridge 或运行 bridge doctor/preflight。
 

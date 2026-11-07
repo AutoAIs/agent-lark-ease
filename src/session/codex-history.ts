@@ -190,7 +190,7 @@ function initializeRequest() {
     id: 1,
     params: {
       clientInfo: {
-        name: 'lark-channel-bridge',
+        name: 'agent-lark-ease',
         title: 'Lark Channel Bridge',
         version: '0.2.3',
       },

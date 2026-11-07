@@ -1,4 +1,5 @@
 import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createBootstrapCodexConfig } from '../profile-bootstrap';
 import { promptLine } from '../prompt';
@@ -10,6 +11,7 @@ import {
   type MigrateV2Options,
   type MigrateV2Result,
 } from '../../config/migrate-v2';
+import { resolveAppPaths } from '../../config/app-paths';
 import { legacyPaths, paths } from '../../config/paths';
 import { agentKindFromString } from '../../config/profile-store';
 import type { RootConfig } from '../../config/profile-schema';
@@ -33,15 +35,19 @@ interface LegacyShape {
 /**
  * One-shot migrator for two pre-0.1.11 changes:
  *
- *  1. Path: ~/.config/lark-channel-bridge/ + ~/.cache/lark-channel-bridge/
+ *  1. Path: ~/.config/agent-lark-ease/ + ~/.cache/agent-lark-ease/
  *     → ~/.lark-channel/
  *  2. Shape: { app: {...} } → { accounts: { app: {...} } }
  *
  * Idempotent — running on an already-migrated setup is a no-op.
  */
 export async function runMigrate(opts: MigrateOptions): Promise<void> {
-  const configPath = opts.config ?? paths.configFile;
-  await migrateLegacyPaths();
+  // Rename ~/.lark-channel -> ~/.agent-lark-ease before resolving paths; the
+  // bin launcher normally does this, but `node dist/cli.js migrate` may skip it.
+  const migratedRoot = opts.config ? undefined : await migrateLegacyStateDir();
+  const activePaths = migratedRoot ? resolveAppPaths({ rootDir: migratedRoot }) : paths;
+  const configPath = opts.config ?? activePaths.configFile;
+  await migrateLegacyPaths({ appDir: activePaths.rootDir, mediaDir: activePaths.mediaDir });
   await migrateConfigShape(configPath);
   const agentKind = agentKindFromString(opts.agent) ?? (opts.profile === 'codex' ? 'codex' : undefined);
   const needsV2Migration = await hasLegacyProfileConfig(configPath);
@@ -156,30 +162,62 @@ async function hasLegacyProfileConfig(path: string): Promise<boolean> {
   return !isRootConfigV2(JSON.parse(raw));
 }
 
-async function migrateLegacyPaths(): Promise<void> {
+async function migrateLegacyPaths(activePaths: {
+  appDir: string;
+  mediaDir: string;
+}): Promise<void> {
   const legacyConfig = await pathExists(legacyPaths.appDir);
   const legacyCache = await pathExists(legacyPaths.cacheDir);
 
   if (!legacyConfig && !legacyCache) return;
 
-  await mkdir(paths.appDir, { recursive: true });
+  await mkdir(activePaths.appDir, { recursive: true });
 
   if (legacyConfig) {
-    await moveDirContents(legacyPaths.appDir, paths.appDir);
+    await moveDirContents(legacyPaths.appDir, activePaths.appDir);
     await rmIfEmpty(legacyPaths.appDir);
-    console.log(`✓ 已搬迁配置：${legacyPaths.appDir} → ${paths.appDir}`);
+    console.log(`✓ 已搬迁配置：${legacyPaths.appDir} → ${activePaths.appDir}`);
   }
   if (legacyCache) {
     // Move media subdirectory if present.
     const legacyMedia = join(legacyPaths.cacheDir, 'media');
     if (await pathExists(legacyMedia)) {
-      await moveDirContents(legacyMedia, paths.mediaDir);
+      await moveDirContents(legacyMedia, activePaths.mediaDir);
       await rmIfEmpty(legacyMedia);
     }
     // Move anything else at the top level too.
-    await moveDirContents(legacyPaths.cacheDir, paths.appDir);
+    await moveDirContents(legacyPaths.cacheDir, activePaths.appDir);
     await rmIfEmpty(legacyPaths.cacheDir);
-    console.log(`✓ 已搬迁缓存：${legacyPaths.cacheDir} → ${paths.appDir}`);
+    console.log(`✓ 已搬迁缓存：${legacyPaths.cacheDir} → ${activePaths.appDir}`);
+  }
+}
+
+/**
+ * Rename the pre-rename `~/.lark-channel` state dir to `~/.agent-lark-ease`
+ * when the new directory does not exist yet. Explicit LARK_EASE_HOME /
+ * LARK_CHANNEL_HOME always wins and disables this move.
+ */
+async function migrateLegacyStateDir(): Promise<string | undefined> {
+  if (process.env.LARK_EASE_HOME || process.env.LARK_CHANNEL_HOME) return undefined;
+  const current = join(homedir(), '.agent-lark-ease');
+  const legacy = legacyPaths.stateDir;
+  if (await pathExists(current)) return undefined;
+  if (!(await pathExists(legacy))) return undefined;
+
+  try {
+    await rename(legacy, current);
+    const legacyWorkspaces = legacyPaths.workspacesDir;
+    const currentWorkspaces = `${current}-workspaces`;
+    if ((await pathExists(legacyWorkspaces)) && !(await pathExists(currentWorkspaces))) {
+      await rename(legacyWorkspaces, currentWorkspaces);
+    }
+    console.log(`✓ 已搬迁状态目录：${legacy} → ${current}`);
+    return current;
+  } catch (err) {
+    console.warn(
+      `! 无法搬迁 ${legacy}（${err instanceof Error ? err.message : String(err)}），继续使用旧目录`,
+    );
+    return undefined;
   }
 }
 

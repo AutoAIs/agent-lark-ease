@@ -63,6 +63,8 @@ ${argStrings}
     <dict>
         <key>PATH</key>
         <string>${escape(inputs.envPath)}</string>
+        <key>LARK_EASE_HOME</key>
+        <string>${escape(inputs.channelHome)}</string>
         <key>LARK_CHANNEL_HOME</key>
         <string>${escape(inputs.channelHome)}</string>
     </dict>

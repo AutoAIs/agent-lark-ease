@@ -55,6 +55,9 @@ async function buildProjectionSecrets(
       args: [],
       env: {
         ...(existing?.env ?? {}),
+        LARK_EASE_HOME: appPaths.rootDir,
+        LARK_EASE_PROFILE: appPaths.profile,
+        // Keep the legacy names for lark-cli builds that predate the rename.
         LARK_CHANNEL_HOME: appPaths.rootDir,
         LARK_CHANNEL_PROFILE: appPaths.profile,
       },

@@ -1,4 +1,4 @@
-# lark-channel-bridge
+# agent-lark-ease
 
 A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
 
@@ -28,15 +28,20 @@ For a product walkthrough, see the [Feishu document](https://larkcommunity.feish
 ## Install
 
 ```bash
-npm i -g lark-channel-bridge
+npm i -g @autoais/agent-lark-ease
 # or
-pnpm add -g lark-channel-bridge
+pnpm add -g @autoais/agent-lark-ease
 ```
+
+If you previously installed `lark-channel-bridge`, stop and unregister its
+daemon first. The first `agent-lark-ease` command automatically renames
+`~/.lark-channel` to `~/.agent-lark-ease`; `LARK_CHANNEL_*` variables remain
+accepted as fallbacks.
 
 ## First run
 
 ```bash
-lark-channel-bridge run
+agent-lark-ease run
 ```
 
 The first run opens a QR-code wizard:
@@ -45,16 +50,16 @@ The first run opens a QR-code wizard:
 2. Scan it with the Feishu / Lark app.
 3. Pick or create a PersonalAgent app.
 4. If prompted, choose which agent to initialize.
-5. Config is written to `~/.lark-channel/config.json`.
+5. Config is written to `~/.agent-lark-ease/config.json`.
 
 You do not need to choose a project directory up front. The bridge creates a profile-managed default working directory; after startup, send `/cd <path>` in Feishu / Lark to switch to a real project.
 
 If you already have a PersonalAgent app, pass `--app-id` during initialization to skip app creation. The command prompts for the App Secret.
 
 ```bash
-lark-channel-bridge run --app-id cli_xxx
+agent-lark-ease run --app-id cli_xxx
 # or initialize and start the background service directly
-lark-channel-bridge start --app-id cli_xxx
+agent-lark-ease start --app-id cli_xxx
 ```
 
 For Lark global apps, add `--tenant lark`.
@@ -64,9 +69,9 @@ For Lark global apps, add `--tenant lark`.
 Use `run` for first-run setup and foreground debugging. After the bot can send and receive messages, stop the foreground process with `Ctrl-C`, then use an OS-managed service for background operation:
 
 ```bash
-lark-channel-bridge start
-lark-channel-bridge status
-lark-channel-bridge stop
+agent-lark-ease start
+agent-lark-ease status
+agent-lark-ease stop
 ```
 
 Install globally before using service commands. The daemon's launchd plist / systemd unit / Windows task records the bridge CLI path; if that path comes from an npm temp cache through `npx`, the daemon can break when the cache is cleaned. `run` is fine through `npx` as a one-shot foreground process.
@@ -74,34 +79,34 @@ Install globally before using service commands. The daemon's launchd plist / sys
 Service commands install a per-profile service:
 
 ```bash
-lark-channel-bridge start [--profile <name>]
-lark-channel-bridge stop [--profile <name>]
-lark-channel-bridge restart [--profile <name>]
-lark-channel-bridge status [--profile <name>]
-lark-channel-bridge unregister [--profile <name>]
+agent-lark-ease start [--profile <name>]
+agent-lark-ease stop [--profile <name>]
+agent-lark-ease restart [--profile <name>]
+agent-lark-ease status [--profile <name>]
+agent-lark-ease unregister [--profile <name>]
 ```
 
 Platform mapping:
-- **macOS**: launchd user agent `ai.lark-channel-bridge.bot.<profile>`
-- **Linux**: systemd user unit `lark-channel-bridge.bot.<profile>.service`
+- **macOS**: launchd user agent `ai.agent-lark-ease.bot.<profile>`
+- **Linux**: systemd user unit `agent-lark-ease.bot.<profile>.service`
 - **Windows**: Task Scheduler task `LarkChannelBridge.Bot.<profile>`, launched through a `.cmd` wrapper
 
-Daemon logs are under `~/.lark-channel/profiles/<profile>/logs/daemon/`.
+Daemon logs are under `~/.agent-lark-ease/profiles/<profile>/logs/daemon/`.
 
 ### Multiple profiles: Claude and Codex
 
 By default, the bridge starts with the currently selected profile. Use `profile use <name>` to change it. Each profile keeps its own app credentials, sessions, working directories, and logs. Create multiple profiles only when you need to connect multiple PersonalAgent apps, or run Claude and Codex as separate bots:
 
 ```bash
-lark-channel-bridge start --profile claude --agent claude
-lark-channel-bridge start --profile codex --agent codex
+agent-lark-ease start --profile claude --agent claude
+agent-lark-ease start --profile codex --agent codex
 ```
 
 For example, to restart only the Codex bot:
 
 ```bash
-lark-channel-bridge restart --profile codex
-lark-channel-bridge status --profile codex
+agent-lark-ease restart --profile codex
+agent-lark-ease status --profile codex
 ```
 
 ## Commands
@@ -109,24 +114,24 @@ lark-channel-bridge status --profile codex
 ### Host CLI
 
 ```text
-lark-channel-bridge run [--profile <name>] [--agent claude|codex] [--workspace <path>] [-c <config>]
-lark-channel-bridge migrate [--profile <name>] [--agent claude|codex]
-lark-channel-bridge ps
-lark-channel-bridge kill <id|#>
-lark-channel-bridge --help
+agent-lark-ease run [--profile <name>] [--agent claude|codex] [--workspace <path>] [-c <config>]
+agent-lark-ease migrate [--profile <name>] [--agent claude|codex]
+agent-lark-ease ps
+agent-lark-ease kill <id|#>
+agent-lark-ease --help
 ```
 
 `profile use <name>` changes the profile used by later default starts. Use these profile management commands when running separate Claude / Codex bots, connecting multiple PersonalAgent apps, or doing scripted deployment:
 
 ```bash
-lark-channel-bridge profile create claude --agent claude
-lark-channel-bridge profile create codex --agent codex
-lark-channel-bridge profile list
-lark-channel-bridge profile use <name>
-lark-channel-bridge profile remove <name>
-lark-channel-bridge profile remove <name> --purge --yes
-lark-channel-bridge profile export <name> [--output ./profile.json] [--force]
-lark-channel-bridge profile export <name> --include-secrets --yes
+agent-lark-ease profile create claude --agent claude
+agent-lark-ease profile create codex --agent codex
+agent-lark-ease profile list
+agent-lark-ease profile use <name>
+agent-lark-ease profile remove <name>
+agent-lark-ease profile remove <name> --purge --yes
+agent-lark-ease profile export <name> [--output ./profile.json] [--force]
+agent-lark-ease profile export <name> --include-secrets --yes
 ```
 
 `profile remove` archives local state by default, including the active profile. If other profiles remain, the bridge switches to the next one; if it was the last profile, the root config is cleared so the same name can be created again. `--purge --yes` permanently deletes local state. `profile export` redacts app secrets by default; `--include-secrets --yes` includes sensitive config.
@@ -173,7 +178,7 @@ When COT is enabled, the bridge splits the process view and final answer into tw
 
 ## lark-cli identity policy
 
-Each profile uses a profile-local lark-cli directory at `~/.lark-channel/profiles/<profile>/lark-cli`. The agent process receives `LARKSUITE_CLI_CONFIG_DIR` for that directory, so personal authorization in one profile is not shared with another profile.
+Each profile uses a profile-local lark-cli directory at `~/.agent-lark-ease/profiles/<profile>/lark-cli`. The agent process receives `LARKSUITE_CLI_CONFIG_DIR` for that directory, so personal authorization in one profile is not shared with another profile.
 
 The default policy is `bot-only`: lark-cli uses the app/bot identity and does not access personal resources. When a user authorizes personal resources such as calendar, mail, or drive, the current profile can switch to `user-default`, which keeps app identity available and also allows the authorized user identity. Owner/admin users can inspect or change this policy in `/config`; `/status` shows the current summary as `lark-cli: app` or `lark-cli: user-ready`.
 
@@ -186,7 +191,7 @@ This is a profile-field snippet. Do not replace the whole `config.json` with it;
 ```json
 {
   "workspaces": {
-    "default": "/Users/me/.lark-channel-workspaces/claude/default"
+    "default": "/Users/me/.agent-lark-ease-workspaces/claude/default"
   }
 }
 ```
@@ -222,19 +227,19 @@ The legacy `sandbox` field is still readable for old configs. After the bridge s
 
 | Path | Content |
 |---|---|
-| `~/.lark-channel/config.json` | Root config with profiles and active profile |
-| `~/.lark-channel/active-profile` | Last selected profile |
-| `~/.lark-channel/profiles/<profile>/sessions.json` | Session state |
-| `~/.lark-channel/profiles/<profile>/sessions.json.catalog.json` | Agent-aware session catalog |
-| `~/.lark-channel/profiles/<profile>/workspaces.json` | Current and named workspace bindings |
-| `~/.lark-channel/profiles/<profile>/secrets.enc` | Profile-local encrypted secrets |
-| `~/.lark-channel/profiles/<profile>/lark-cli/` | Profile-local lark-cli directory |
-| `~/.lark-channel/profiles/<profile>/media/` | Attachment cache |
-| `~/.lark-channel/profiles/<profile>/logs/` | Structured run logs |
-| `~/.lark-channel/registry/processes.json` | Local process registry |
-| `~/.lark-channel/registry/locks/` | Profile and app locks |
+| `~/.agent-lark-ease/config.json` | Root config with profiles and active profile |
+| `~/.agent-lark-ease/active-profile` | Last selected profile |
+| `~/.agent-lark-ease/profiles/<profile>/sessions.json` | Session state |
+| `~/.agent-lark-ease/profiles/<profile>/sessions.json.catalog.json` | Agent-aware session catalog |
+| `~/.agent-lark-ease/profiles/<profile>/workspaces.json` | Current and named workspace bindings |
+| `~/.agent-lark-ease/profiles/<profile>/secrets.enc` | Profile-local encrypted secrets |
+| `~/.agent-lark-ease/profiles/<profile>/lark-cli/` | Profile-local lark-cli directory |
+| `~/.agent-lark-ease/profiles/<profile>/media/` | Attachment cache |
+| `~/.agent-lark-ease/profiles/<profile>/logs/` | Structured run logs |
+| `~/.agent-lark-ease/registry/processes.json` | Local process registry |
+| `~/.agent-lark-ease/registry/locks/` | Profile and app locks |
 
-Set `LARK_CHANNEL_HOME=/path/to/state` to move all local bridge state. `LARK_CHANNEL_LOG_DAYS` overrides log retention.
+Set `LARK_EASE_HOME=/path/to/state` to move all local bridge state. `LARK_EASE_LOG_DAYS` overrides log retention.
 
 ## Access control
 
@@ -272,7 +277,7 @@ To let other people or groups in, add them to one of three lists:
 
 ### Advanced: editing the config file directly
 
-If you'd rather not do it inside Feishu, `/invite` and `/config` write the matching profile's `access` field in `~/.lark-channel/config.json`. Empty lists mean nobody from that list, not open access. This is a profile-field snippet; do not replace the whole `config.json` with it:
+If you'd rather not do it inside Feishu, `/invite` and `/config` write the matching profile's `access` field in `~/.agent-lark-ease/config.json`. Empty lists mean nobody from that list, not open access. This is a profile-field snippet; do not replace the whole `config.json` with it:
 
 ```json
 {
@@ -294,7 +299,7 @@ If you'd rather not do it inside Feishu, `/invite` and `/config` write the match
 `allowedUsers` / `admins` take user `open_id`s; `allowedChats` takes group `chat_id`s. The easiest way to find an ID by hand: have the person message the bot (or `@` it in the group), then check the active profile's log:
 
 ```bash
-grep '"event":"enter"' ~/.lark-channel/profiles/<profile>/logs/bridge-$(date +%Y%m%d).jsonl | tail -5
+grep '"event":"enter"' ~/.agent-lark-ease/profiles/<profile>/logs/bridge-$(date +%Y%m%d).jsonl | tail -5
 ```
 
 Each line carries `chatId` (group / DM id) and `senderId` (user `open_id`). After a manual edit, **restart the bridge** or send `/reconnect` from an allowed admin context to apply it. For day-to-day tweaks `/invite` / `/config` are easier; direct edits are mainly for deployment scripts that pre-seed access.
@@ -330,13 +335,13 @@ By default the bridge reports **nothing**: no metrics, no logs leave your machin
 To wire up your own monitoring, point an environment variable at a module that default-exports (or exports `createAdapter`) an `AdapterFactory`:
 
 ```bash
-LARK_CHANNEL_TELEMETRY_MODULE=your-telemetry-package lark-channel-bridge start
+LARK_EASE_TELEMETRY_MODULE=your-telemetry-package agent-lark-ease start
 ```
 
 That module receives every `log.*` event plus error/metric hooks and forwards them wherever you like. The interface is exported from the package root:
 
 ```ts
-import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'lark-channel-bridge';
+import type { AdapterFactory, TelemetryAdapter, TelemetryEvent } from 'agent-lark-ease';
 
 const createAdapter: AdapterFactory = (meta) => ({
   emit(event) {/* ship event */},

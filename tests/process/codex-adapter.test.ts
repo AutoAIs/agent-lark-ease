@@ -71,10 +71,10 @@ describe('CodexAdapter process contract', () => {
     expect(record.argv).not.toContain('--ignore-user-config');
     expect(record.argv).toContain('--skip-git-repo-check');
     expect(record.argv).not.toContain('hello from lark');
-    expect(record.stdin).toContain('lark-channel-bridge 运行约定');
+    expect(record.stdin).toContain('agent-lark-ease 运行约定');
     expect(record.stdin).toContain('__bridge_cb');
     expect(record.stdin).toContain('lark-cli auth login');
-    expect(record.stdin).toContain('LARK_CHANNEL_PROFILE');
+    expect(record.stdin).toContain('LARK_EASE_PROFILE');
     expect(record.stdin).toContain('LARKSUITE_CLI_CONFIG_DIR');
     expect(record.stdin).not.toContain('lark-cli config bind --source lark-channel');
     expect(record.stdin).toContain('hello from lark');
@@ -447,6 +447,10 @@ async function createFakeCodex(options: {
       '    cwd: process.cwd(),',
       '    stdin,',
       '    env: {',
+      '      LARK_EASE: process.env.LARK_EASE,',
+      '      LARK_EASE_PROFILE: process.env.LARK_EASE_PROFILE,',
+      '      LARK_EASE_HOME: process.env.LARK_EASE_HOME,',
+      '      LARK_EASE_CONFIG: process.env.LARK_EASE_CONFIG,',
       '      LARK_CHANNEL: process.env.LARK_CHANNEL,',
       '      LARK_CHANNEL_PROFILE: process.env.LARK_CHANNEL_PROFILE,',
       '      LARK_CHANNEL_HOME: process.env.LARK_CHANNEL_HOME,',
@@ -474,6 +478,10 @@ async function readRecord(path: string): Promise<{
   cwd: string;
   stdin: string;
   env: {
+    LARK_EASE?: string;
+    LARK_EASE_PROFILE?: string;
+    LARK_EASE_HOME?: string;
+    LARK_EASE_CONFIG?: string;
     LARK_CHANNEL?: string;
     LARK_CHANNEL_PROFILE?: string;
     LARK_CHANNEL_HOME?: string;
@@ -489,7 +497,11 @@ async function readRecord(path: string): Promise<{
     cwd: string;
     stdin: string;
     env: {
-      LARK_CHANNEL?: string;
+      LARK_EASE?: string;
+    LARK_EASE_PROFILE?: string;
+    LARK_EASE_HOME?: string;
+    LARK_EASE_CONFIG?: string;
+    LARK_CHANNEL?: string;
       LARK_CHANNEL_PROFILE?: string;
       LARK_CHANNEL_HOME?: string;
       LARK_CHANNEL_CONFIG?: string;

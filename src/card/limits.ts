@@ -1,3 +1,4 @@
+import { readBridgeEnv } from '../config/env-compat';
 import { collapsiblePanel, markdown, noteMd } from './elements';
 
 /**
@@ -18,33 +19,33 @@ const DEFAULT_TABLE_KEEP = 2;
 const DEFAULT_CAPS: CardCaps = { chars: 50_000, bytes: 65_000, elems: 46 };
 
 function envInt(name: string, fallback: number): number {
-  const raw = process.env[name];
+  const raw = readBridgeEnv(name);
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
 export function cardTextMaxChars(): number {
-  return envInt('LARK_CHANNEL_CARD_TEXT_MAX_CHARS', DEFAULT_TEXT_MAX_CHARS);
+  return envInt('CARD_TEXT_MAX_CHARS', DEFAULT_TEXT_MAX_CHARS);
 }
 
 export function cardCompactMaxElements(): number {
-  return envInt('LARK_CHANNEL_CARD_COMPACT_MAX_ELEMENTS', DEFAULT_COMPACT_MAX_ELEMENTS);
+  return envInt('CARD_COMPACT_MAX_ELEMENTS', DEFAULT_COMPACT_MAX_ELEMENTS);
 }
 
 export function cardCompactKeepTail(): number {
-  return envInt('LARK_CHANNEL_CARD_COMPACT_KEEP_TAIL', DEFAULT_COMPACT_KEEP_TAIL);
+  return envInt('CARD_COMPACT_KEEP_TAIL', DEFAULT_COMPACT_KEEP_TAIL);
 }
 
 export function cardTableKeep(): number {
-  return envInt('LARK_CHANNEL_CARD_TABLE_KEEP', DEFAULT_TABLE_KEEP);
+  return envInt('CARD_TABLE_KEEP', DEFAULT_TABLE_KEEP);
 }
 
 export function cardDeliveryCaps(): CardCaps {
   return {
-    chars: envInt('LARK_CHANNEL_CARD_MAX_CHARS', DEFAULT_CAPS.chars),
-    bytes: envInt('LARK_CHANNEL_CARD_MAX_BYTES', DEFAULT_CAPS.bytes),
-    elems: envInt('LARK_CHANNEL_CARD_MAX_ELEMENTS', DEFAULT_CAPS.elems),
+    chars: envInt('CARD_MAX_CHARS', DEFAULT_CAPS.chars),
+    bytes: envInt('CARD_MAX_BYTES', DEFAULT_CAPS.bytes),
+    elems: envInt('CARD_MAX_ELEMENTS', DEFAULT_CAPS.elems),
   };
 }
 

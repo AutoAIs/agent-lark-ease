@@ -27,6 +27,7 @@ import { readUiSidecar, removeUiSidecar, writeUiSidecar } from '../../ui/sidecar
 import type { UiServerHandle } from '../../ui/types';
 import { Supervisor } from '../../runtime/supervisor';
 import { acquireHostLock } from '../../runtime/host-lock';
+import { assertNoLegacyBridge } from '../../runtime/legacy-root-check';
 import { preFlightChecks } from '../preflight';
 import { promptAndStopActiveBridgeMigrationConflict } from './migrate';
 import { stopProcessEntry, type StopProcessEntryResult } from './ps';
@@ -107,6 +108,7 @@ export interface StartOptions {
  *    all profiles + a local web console to start/stop/configure them.
  */
 export async function runStart(opts: StartOptions): Promise<void> {
+  assertNoLegacyBridge();
   if (opts.webUi) {
     await runSupervisorConsole(opts);
     return;
@@ -363,7 +365,7 @@ async function confirmStopRuntimeLockProcess(err: RuntimeLockConflictError): Pro
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
       `当前 ${err.kind === 'profile' ? 'profile' : 'app'} 已有 bridge 进程占用；` +
-        '非交互模式无法确认停止，请先用 `lark-channel-bridge ps` 查看并用 `lark-channel-bridge kill <bot id>` 停止后重试',
+        '非交互模式无法确认停止，请先用 `agent-lark-ease ps` 查看并用 `agent-lark-ease kill <bot id>` 停止后重试',
     );
   }
 

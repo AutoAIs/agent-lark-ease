@@ -632,7 +632,9 @@ async function createHarness(options: {
     codex: {
       binaryPath: '/usr/local/bin/codex',
     },
-    ...(options.messageReply ? { preferences: { messageReply: options.messageReply } } : {}),
+    // This suite exercises the markdown progress stream; keep that mode
+    // explicit now that the product default is card.
+    preferences: { messageReply: options.messageReply ?? 'markdown' },
   });
   const profileConfig = {
     ...baseProfileConfig,

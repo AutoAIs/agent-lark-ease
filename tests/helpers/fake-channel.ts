@@ -20,6 +20,8 @@ export interface FakeRawClientRequest {
 export interface FakeChannel {
   readonly sent: FakeChannelMessage[];
   readonly streams: FakeChannelStream[];
+  readonly updatedCards: Array<{ messageId: string; card: unknown }>;
+  readonly recalledMessageIds: string[];
   /**
    * Maps a messageId to the `thread_id` that `fetchRawMessage` should report
    * for it — mirrors the raw `im.v1.message.get` items[0].thread_id that the
@@ -50,13 +52,17 @@ export interface FakeChannel {
   };
   createCard(cardJson: unknown): Promise<{ cardId: string }>;
   updateCardById(cardId: string, cardJson: unknown, sequence: number): Promise<void>;
+  updateCard(messageId: string, card: unknown): Promise<void>;
+  recallMessage(messageId: string): Promise<void>;
   send(chatId: string, content: unknown, options?: unknown): Promise<{ messageId: string }>;
-  stream(chatId: string, input: unknown, options?: unknown): Promise<void>;
+  stream(chatId: string, input: unknown, options?: unknown): Promise<{ messageId: string }>;
 }
 
 export function createFakeChannel(): FakeChannel {
   const sent: FakeChannelMessage[] = [];
   const streams: FakeChannelStream[] = [];
+  const updatedCards: Array<{ messageId: string; card: unknown }> = [];
+  const recalledMessageIds: string[] = [];
   const requests: FakeRawClientRequest[] = [];
   const rawThreadIds = new Map<string, string>();
   const cardById = new Map<string, unknown>();
@@ -77,6 +83,8 @@ export function createFakeChannel(): FakeChannel {
   return {
     sent,
     streams,
+    updatedCards,
+    recalledMessageIds,
     rawThreadIds,
     async fetchRawMessage(messageId: string): Promise<Array<{ thread_id?: string }>> {
       const threadId = rawThreadIds.get(messageId);
@@ -129,6 +137,14 @@ export function createFakeChannel(): FakeChannel {
     async updateCardById(cardId: string, cardJson: unknown, sequence: number): Promise<void> {
       requests.push({ method: 'cardkit.v1.card.update', params: { cardId, cardJson, sequence } });
     },
+    async updateCard(messageId: string, card: unknown): Promise<void> {
+      updatedCards.push({ messageId, card });
+      requests.push({ method: 'im.v1.message.patch', params: { messageId, card } });
+    },
+    async recallMessage(messageId: string): Promise<void> {
+      recalledMessageIds.push(messageId);
+      requests.push({ method: 'im.v1.message.delete', params: { messageId } });
+    },
     async send(chatId: string, content: unknown, options?: unknown): Promise<{ messageId: string }> {
       // Resolve a `{ cardId }` reference back to the card JSON so assertions
       // can read the rendered card content (matching the legacy send shape).
@@ -140,7 +156,7 @@ export function createFakeChannel(): FakeChannel {
       sent.push({ chatId, content: resolved, options });
       return { messageId: `om_fake_${nextMessage++}` };
     },
-    async stream(chatId: string, input: unknown, options?: unknown): Promise<void> {
+    async stream(chatId: string, input: unknown, options?: unknown): Promise<{ messageId: string }> {
       const record: FakeChannelStream = {
         chatId,
         input,
@@ -149,6 +165,7 @@ export function createFakeChannel(): FakeChannel {
         markdownContents: [],
       };
       streams.push(record);
+      const messageId = `om_stream_${streams.length}`;
 
       if (isCardStreamInput(input)) {
         await input.card.producer({
@@ -165,6 +182,8 @@ export function createFakeChannel(): FakeChannel {
           },
         });
       }
+
+      return { messageId };
     },
   };
 

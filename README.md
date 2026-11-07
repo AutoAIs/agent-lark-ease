@@ -9,8 +9,6 @@ a PersonalAgent app, and talk to your local coding agent from chat.
 
 [中文 README](./README.zh.md)
 
-For a product walkthrough, see the [Feishu document](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e).
-
 > **Project status:** Agent Ease for Lark (`agent-lark-ease`) began as a fork of
 > [`lark-channel-bridge`](https://github.com/zarazhangrui/feishu-claude-code-bridge)
 > and is now developed independently; see
@@ -404,5 +402,3 @@ A missing module, a bad factory, or a throwing adapter all degrade to noop — t
 ## License
 
 [MIT](./LICENSE)
-
-<img src="./assets/feedback-group-qr.png" alt="Feedback group QR code" width="360">

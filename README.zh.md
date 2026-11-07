@@ -6,8 +6,6 @@
 
 [English README](./README.md)
 
-关于能实现的效果，详情可以阅读[飞书文档](https://larkcommunity.feishu.cn/docx/OaRIdFIRFoLM3xxTmKwcetHqn5e)
-
 > **项目定位**：Agent Ease for Lark（`agent-lark-ease`）最初 fork 自
 > [`lark-channel-bridge`](https://github.com/zarazhangrui/feishu-claude-code-bridge)，
 > 现已独立发展；从旧版升级见[从 lark-channel-bridge 升级](#从-lark-channel-bridge-升级)。
@@ -392,5 +390,3 @@ export default createAdapter;
 ## 许可
 
 [MIT](./LICENSE)
-
-<img src="./assets/feedback-group-qr.png" alt="飞书反馈群二维码" width="360">

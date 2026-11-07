@@ -9,6 +9,22 @@ vi.mock('node:child_process', async (importOriginal) => ({
   spawnSync: mocks.spawnSync,
 }));
 
+// This suite fakes `process.platform = 'darwin'`, so `os.userInfo()` and
+// `os.homedir()` must also look like macOS even when the test runs on a
+// Windows/CI runner (uid -1, C:\Users\... otherwise leak into launchctl args).
+vi.mock('node:os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:os')>()),
+  homedir: () => '/Users/runner',
+  userInfo: () =>
+    ({
+      uid: 501,
+      gid: 20,
+      username: 'runner',
+      homedir: '/Users/runner',
+      shell: '/bin/zsh',
+    }) as ReturnType<typeof import('node:os').userInfo>,
+}));
+
 const { getServiceAdapter } = await import('../../../src/daemon/service-adapter');
 const { launchAgentLabel } = await import('../../../src/daemon/paths');
 

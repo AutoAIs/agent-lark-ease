@@ -64,7 +64,9 @@ interface FakeLarkChannel {
   getChatMode(chatId: string): Promise<'group' | 'topic'>;
   getConnectionStatus(): { state: 'connected'; reconnectAttempts: number };
   send(chatId: string, content: unknown, options?: unknown): Promise<{ messageId: string }>;
-  stream(chatId: string, input: unknown, options?: unknown): Promise<void>;
+  stream(chatId: string, input: unknown, options?: unknown): Promise<{ messageId?: string } | void>;
+  updateCard(messageId: string, card: unknown): Promise<void>;
+  recallMessage(messageId: string): Promise<void>;
   addReaction(messageId: string, emojiType: string): Promise<string>;
   removeReaction(messageId: string, reactionId: string): Promise<void>;
 }
@@ -577,6 +579,8 @@ function createFakeLarkChannel(harnessOptions: {
     stream: harnessOptions.stream ?? (async () => {
       await new Promise<void>(() => {});
     }),
+    async updateCard() {},
+    async recallMessage() {},
     async addReaction(messageId, emojiType) {
       const r = await channel.rawClient.im.v1.messageReaction.create({
         path: { message_id: messageId },

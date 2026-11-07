@@ -1,3 +1,4 @@
+import { readBridgeEnv } from '../config/env-compat';
 import type { LogContext, LogFields } from './logger';
 
 /**
@@ -118,7 +119,7 @@ function wrapSafe(adapter: TelemetryAdapter): TelemetryAdapter {
  * Never throws: a broken telemetry module must not stop the bridge starting.
  */
 export async function loadTelemetryAdapter(meta: AdapterMeta): Promise<void> {
-  const mod = process.env.LARK_CHANNEL_TELEMETRY_MODULE;
+  const mod = readBridgeEnv('TELEMETRY_MODULE');
   if (!mod) return;
   try {
     const imported = (await import(normalizeModuleSpecifier(mod))) as {

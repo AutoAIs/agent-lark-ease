@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { readBridgeEnv } from './env-compat';
 
 export interface ResolveAppPathsOptions {
   rootDir?: string;
@@ -43,7 +44,8 @@ export interface AppPaths {
 const DEFAULT_PROFILE = 'claude';
 
 export function resolveAppPaths(opts: ResolveAppPathsOptions = {}): AppPaths {
-  const rootDir = opts.rootDir ?? process.env.LARK_CHANNEL_HOME ?? join(homedir(), '.lark-channel');
+  const rootDir =
+    opts.rootDir ?? readBridgeEnv('HOME') ?? join(homedir(), '.agent-lark-ease');
   const profile = normalizeProfileName(opts.profile ?? DEFAULT_PROFILE);
   const profileDir = join(rootDir, 'profiles', profile);
   const registryDir = join(rootDir, 'registry');

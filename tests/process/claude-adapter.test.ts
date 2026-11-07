@@ -56,9 +56,9 @@ describe('ClaudeAdapter process contract', () => {
       '--append-system-prompt-file',
     ]);
     expect(record.argv).not.toContain('hello');
-    expect(record.systemPrompt).toContain('lark-channel-bridge 运行约定');
+    expect(record.systemPrompt).toContain('agent-lark-ease 运行约定');
     expect(record.systemPrompt).toContain('__bridge_cb');
-    expect(record.systemPrompt).toContain('LARK_CHANNEL_PROFILE');
+    expect(record.systemPrompt).toContain('LARK_EASE_PROFILE');
     expect(record.systemPrompt).toContain('LARKSUITE_CLI_CONFIG_DIR');
     expect(record.systemPrompt).not.toContain('lark-cli config bind --source lark-channel');
     expect(record.systemPrompt).not.toContain('__claude_cb');
@@ -244,6 +244,10 @@ async function createFakeClaude(options: {
       '    systemPrompt,',
       '    cwd: process.cwd(),',
       '    env: {',
+      '      LARK_EASE: process.env.LARK_EASE,',
+      '      LARK_EASE_PROFILE: process.env.LARK_EASE_PROFILE,',
+      '      LARK_EASE_HOME: process.env.LARK_EASE_HOME,',
+      '      LARK_EASE_CONFIG: process.env.LARK_EASE_CONFIG,',
       '      LARK_CHANNEL: process.env.LARK_CHANNEL,',
       '      LARK_CHANNEL_PROFILE: process.env.LARK_CHANNEL_PROFILE,',
       '      LARK_CHANNEL_HOME: process.env.LARK_CHANNEL_HOME,',
@@ -269,6 +273,10 @@ async function readRecord(path: string): Promise<{
   systemPrompt: string | null;
   cwd: string;
   env: {
+    LARK_EASE?: string;
+    LARK_EASE_PROFILE?: string;
+    LARK_EASE_HOME?: string;
+    LARK_EASE_CONFIG?: string;
     LARK_CHANNEL?: string;
     LARK_CHANNEL_PROFILE?: string;
     LARK_CHANNEL_HOME?: string;
@@ -282,7 +290,11 @@ async function readRecord(path: string): Promise<{
     systemPrompt: string | null;
     cwd: string;
     env: {
-      LARK_CHANNEL?: string;
+      LARK_EASE?: string;
+    LARK_EASE_PROFILE?: string;
+    LARK_EASE_HOME?: string;
+    LARK_EASE_CONFIG?: string;
+    LARK_CHANNEL?: string;
       LARK_CHANNEL_PROFILE?: string;
       LARK_CHANNEL_HOME?: string;
       LARK_CHANNEL_CONFIG?: string;

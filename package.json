@@ -1,7 +1,7 @@
 {
-  "name": "lark-channel-bridge",
-  "version": "0.7.1",
-  "description": "Bridge Feishu/Lark messenger with local CLI coding agents",
+  "name": "@autoais/agent-lark-ease",
+  "version": "0.8.0",
+  "description": "agent-lark-ease: bridge Feishu/Lark messenger with local CLI coding agents",
   "type": "module",
   "packageManager": "pnpm@12.18.0",
   "publishConfig": {
@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zarazhangrui/feishu-claude-code-bridge.git"
+    "url": "git+https://github.com/AutoAIs/agent-lark-ease.git"
   },
   "bugs": {
-    "url": "https://github.com/zarazhangrui/feishu-claude-code-bridge/issues"
+    "url": "https://github.com/AutoAIs/agent-lark-ease/issues"
   },
-  "homepage": "https://github.com/zarazhangrui/feishu-claude-code-bridge#readme",
+  "homepage": "https://github.com/AutoAIs/agent-lark-ease#readme",
   "bin": {
-    "lark-channel-bridge": "./bin/lark-channel-bridge.mjs"
+    "agent-lark-ease": "./bin/agent-lark-ease.mjs"
   },
   "exports": {
     ".": {
@@ -96,6 +96,7 @@
     "node": ">=26.0.0"
   },
   "keywords": [
+    "agent-lark-ease",
     "feishu",
     "lark",
     "claude",

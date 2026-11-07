@@ -1,5 +1,5 @@
 import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveAppPaths } from '../../../src/config/app-paths';
@@ -52,6 +52,40 @@ describe('resolveAppPaths', () => {
     expect(paths.mediaDir).toBe(join(profileDir, 'media'));
     expect(paths.logsDir).toBe(join(profileDir, 'logs'));
     expect(paths.secretsGetterScript).toBe(join(root, 'secrets-getter'));
+  });
+
+  it('defaults to ~/.agent-lark-ease when no home env is set', () => {
+    const savedEase = process.env.LARK_EASE_HOME;
+    const savedLegacy = process.env.LARK_CHANNEL_HOME;
+    delete process.env.LARK_EASE_HOME;
+    delete process.env.LARK_CHANNEL_HOME;
+    try {
+      expect(resolveAppPaths({ profile: 'claude' }).rootDir).toBe(
+        join(homedir(), '.agent-lark-ease'),
+      );
+    } finally {
+      if (savedEase === undefined) delete process.env.LARK_EASE_HOME;
+      else process.env.LARK_EASE_HOME = savedEase;
+      if (savedLegacy === undefined) delete process.env.LARK_CHANNEL_HOME;
+      else process.env.LARK_CHANNEL_HOME = savedLegacy;
+    }
+  });
+
+  it('prefers LARK_EASE_HOME over the legacy LARK_CHANNEL_HOME', async () => {
+    const easeRoot = await tempRoot();
+    const legacyRoot = await tempRoot();
+    const savedEase = process.env.LARK_EASE_HOME;
+    const savedLegacy = process.env.LARK_CHANNEL_HOME;
+    process.env.LARK_EASE_HOME = easeRoot;
+    process.env.LARK_CHANNEL_HOME = legacyRoot;
+    try {
+      expect(resolveAppPaths({ profile: 'claude' }).rootDir).toBe(easeRoot);
+    } finally {
+      if (savedEase === undefined) delete process.env.LARK_EASE_HOME;
+      else process.env.LARK_EASE_HOME = savedEase;
+      if (savedLegacy === undefined) delete process.env.LARK_CHANNEL_HOME;
+      else process.env.LARK_CHANNEL_HOME = savedLegacy;
+    }
   });
 
   it('uses LARK_CHANNEL_HOME only for the root directory, not profile selection', async () => {

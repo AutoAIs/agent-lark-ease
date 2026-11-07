@@ -33,4 +33,7 @@ export const legacyPaths = {
     process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'),
     'lark-channel-bridge',
   ),
+  /** Pre-rename state layout (`~/.lark-channel`). */
+  stateDir: join(homedir(), '.lark-channel'),
+  workspacesDir: join(homedir(), '.lark-channel-workspaces'),
 };

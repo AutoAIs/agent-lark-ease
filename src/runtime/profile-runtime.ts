@@ -9,6 +9,7 @@ import {
   resolveBootstrapWorkspace,
 } from '../cli/profile-bootstrap';
 import { promptPassword } from '../cli/prompt';
+import { readBridgeEnv } from '../config/env-compat';
 import { setSecret } from '../config/keystore';
 import { resolveAppPaths, type AppPaths } from '../config/app-paths';
 import {
@@ -88,7 +89,7 @@ export function createRuntimeProfileConfig(
   return createDefaultProfileConfig({
     ...input,
     ...(input.agentKind === 'codex'
-      ? { codex: input.codex ?? { binaryPath: process.env.LARK_CHANNEL_CODEX_BIN ?? 'codex' } }
+      ? { codex: input.codex ?? { binaryPath: readBridgeEnv('CODEX_BIN') ?? 'codex' } }
       : {}),
   });
 }
@@ -431,7 +432,7 @@ async function resolveBootstrapAppConfig(opts: ResolveProfileRuntimeOptions): Pr
     if (!isInteractiveTerminal()) {
       throw new Error(
         '当前没有配置，非交互模式无法完成扫码创建应用。' +
-          '请先在终端运行 `lark-channel-bridge run` 完成首次初始化，' +
+          '请先在终端运行 `agent-lark-ease run` 完成首次初始化，' +
           '或传入 --app-id 和 --app-secret。',
       );
     }

@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+# A single push already runs once for its head commit. When the same ref is
+# pushed again (or a PR receives new commits), cancel the superseded run so
+# only the latest one continues.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Node 26 on ${{ matrix.os }}
